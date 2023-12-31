@@ -2,144 +2,59 @@ package flixel.system.frontEnds;
 
 import flixel.FlxG;
 
-/**
- * Accessed via `FlxG.console`.
- */
 class ConsoleFrontEnd
 {
 	/**
-	 * Whether the console should auto-pause or not when it's focused.
+	 * Whether the console should auto-pause or not when it's focused. Only works for flash atm.
 	 */
 	public var autoPause:Bool = true;
-
+	
 	/**
-	 * Whether the console should `step()` the game after a command is entered.
-	 * Setting this to `false` allows inputting multiple console commands within the same frame.
-	 * Use the `step()` command to step the game from the console.
-	 * @since 4.2.0
+	 * Register a new function to use for the call command.
+	 * 
+	 * @param 	FunctionAlias		The name with which you want to access the function.
+	 * @param 	Function			The function to register.
 	 */
-	public var stepAfterCommand:Bool = true;
-
-	/**
-	 * Register a new function to use in any command.
-	 *
-	 * @param   alias  The name with which you want to access the function.
-	 * @param   func   The function to register.
-	 */
-	public inline function registerFunction(alias:String, func:Dynamic):Void
+	public inline function registerFunction(FunctionAlias:String, Function:Dynamic):Void
 	{
-		#if FLX_DEBUG
-		FlxG.game.debugger.console.registerFunction(alias, func);
-		#end
-	}
-
-	/**
-	 * Register a new object to use in any command.
-	 *
-	 * @param   alias   The name with which you want to access the object.
-	 * @param   object  The object to register.
-	 */
-	public inline function registerObject(alias:String, object:Dynamic):Void
-	{
-		#if FLX_DEBUG
-		FlxG.game.debugger.console.registerObject(alias, object);
-		#end
-	}
-
-	/**
-	 * Removes an object from the command registry.
-	 *
-	 * Note: `removeByAlias` is more performant, as this method searches the list for the object.
-	 *
-	 * @param   object  The object to remove.
-	 * @since 5.4.0
-	 */
-	public inline function removeObject(object:Dynamic)
-	{
-		#if FLX_DEBUG
-		FlxG.game.debugger.console.removeObject(object);
-		#end
-	}
-
-	/**
-	 * Removes a function from the command registry.
-	 *
-	 * Note: `removeByAlias` is more performant, as this method searches the list for the function.
-	 *
-	 * @param   func  The object to remove.
-	 * @since 5.4.0
-	 */
-	public inline function removeFunction(func:Dynamic)
-	{
-		#if FLX_DEBUG
-		FlxG.game.debugger.console.removeFunction(func);
+		#if !FLX_NO_DEBUG
+		FlxG.game.debugger.console.registerFunction(FunctionAlias, Function);
 		#end
 	}
 	
 	/**
-	 * Removes an alias from the command registry.
-	 *
-	 * @param   alias  The alias to remove.
-	 * @since 5.4.0
+	 * Register a new object to use for the set command.
+	 * 
+	 * @param 	ObjectAlias		The name with which you want to access the object.
+	 * @param 	AnyObject		The object to register.
 	 */
-	public inline function removeByAlias(alias:String)
+	public inline function registerObject(ObjectAlias:String, AnyObject:Dynamic):Void
 	{
-		#if FLX_DEBUG
-		FlxG.game.debugger.console.removeByAlias(alias);
+		#if !FLX_NO_DEBUG
+		FlxG.game.debugger.console.registerObject(ObjectAlias, AnyObject);
 		#end
 	}
-
+	
 	/**
-	 * Register a new class to use in any command.
-	 *
-	 * @param   c  The class to register.
+	 * Add a custom command to the console on the debugging screen.
+	 * 
+	 * @param 	Aliases			An array of accepted aliases for this command.
+	 * @param 	ProcessFunction	Function to be called with params when the command is entered.
+	 * @param	Help			The description of this command shown in the help command.
+	 * @param	ParamHelp		The description of this command's processFunction's params.
+	 * @param 	NumParams		The amount of parameters a function has. Require to prevent crashes on Neko.
+	 * @param	ParamCutoff		At which parameter to put all remaining params into an array
 	 */
-	public inline function registerClass(c:Class<Dynamic>):Void
+	public inline function addCommand(Aliases:Array<String>, ProcessFunction:Dynamic, ?Help:String, ?ParamHelp:String, NumParams:Int = 0, ParamCutoff:Int = -1):Void
 	{
-		#if FLX_DEBUG
-		FlxG.game.debugger.console.registerClass(c);
+		#if !FLX_NO_DEBUG
+		FlxG.game.debugger.console.addCommand(Aliases, ProcessFunction, Help, ParamHelp, NumParams, ParamCutoff);
 		#end
 	}
-
+	
 	/**
-	 * Removes a class from the command registry.
-	 *
-	 * @param   c  The class to remove.
-	 * @since 5.4.0
+	 * Just needed to create an instance.
 	 */
-	public inline function removeClass(c:Class<Dynamic>):Void
-	{
-		#if FLX_DEBUG
-		FlxG.game.debugger.console.removeClass(c);
-		#end
-	}
-
-	/**
-	 * Register a new enum to use in any command.
-	 *
-	 * @param   e  The enum to register.
-	 * @since 4.4.0
-	 */
-	public inline function registerEnum(e:Enum<Dynamic>):Void
-	{
-		#if FLX_DEBUG
-		FlxG.game.debugger.console.registerEnum(e);
-		#end
-	}
-
-	/**
-	 * Removes an enum from the command registry.
-	 *
-	 * @param   e  The enum to remove.
-	 * @since 5.4.0
-	 */
-	public inline function removeEnum(e:Enum<Dynamic>):Void
-	{
-		#if FLX_DEBUG
-		FlxG.game.debugger.console.removeEnum(e);
-		#end
-	}
-
 	@:allow(flixel.FlxG)
-	function new() {}
+	private function new() {}
 }
