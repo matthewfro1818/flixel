@@ -1,14 +1,13 @@
 package flixel.system.frontEnds;
 
-import openfl.display.BitmapData;
+import flash.display.BitmapData;
 import flixel.FlxG;
-import flixel.FlxSprite;
 
 class BitmapLogFrontEnd
 {
 	public inline function add(Data:BitmapData, Name:String = ""):Void
 	{
-		#if !FLX_NO_DEBUG
+		#if FLX_DEBUG
 		FlxG.game.debugger.bitmapLog.add(Data, Name);
 		#end
 	}
@@ -18,7 +17,7 @@ class BitmapLogFrontEnd
 	 */
 	public inline function clear():Void
 	{
-		#if !FLX_NO_DEBUG
+		#if FLX_DEBUG
 		FlxG.game.debugger.bitmapLog.clear();
 		#end
 	}
@@ -29,7 +28,7 @@ class BitmapLogFrontEnd
 	 */
 	public inline function clearAt(Index:Int = -1):Void 
 	{
-		#if !FLX_NO_DEBUG
+		#if FLX_DEBUG
 		FlxG.game.debugger.bitmapLog.clearAt(Index);
 		#end
 	}
@@ -39,7 +38,7 @@ class BitmapLogFrontEnd
 	 */
 	public function viewCache():Void
 	{
-		#if !FLX_NO_DEBUG
+		#if FLX_DEBUG
 		clear();
 		for (cachedGraphic in FlxG.bitmap._cache)
 		{

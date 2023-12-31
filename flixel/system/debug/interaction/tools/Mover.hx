@@ -1,82 +1,81 @@
 package flixel.system.debug.interaction.tools;
 
-import openfl.display.BitmapData;
-import openfl.ui.Keyboard;
+import flash.display.BitmapData;
+import flash.ui.Keyboard;
 import flixel.FlxObject;
 import flixel.math.FlxPoint;
 import flixel.system.debug.interaction.Interaction;
 
-@:bitmap("assets/images/debugger/buttons/mover.png")
-private class GraphicMoverTool extends BitmapData {}
+@:bitmap("assets/images/debugger/buttons/mover.png") 
+class GraphicMoverTool extends BitmapData {}
 
 /**
  * A tool to move selected items.
- *
+ * 
  * @author Fernando Bevilacqua (dovyski@gmail.com)
  */
 class Mover extends Tool
 {
-	var _dragging:Bool = false;
-	var _lastCursorPosition:FlxPoint;
-
-	override public function init(brain:Interaction):Tool
+	private var _dragging:Bool = false;
+	private var _lastCursorPosition:FlxPoint;
+	
+	override public function init(brain:Interaction):Tool 
 	{
 		super.init(brain);
 		_lastCursorPosition = new FlxPoint(brain.flixelPointer.x, brain.flixelPointer.x);
 
 		_name = "Mover";
-		_shortcut = brain.macKeyboard ? "⌘" : "Ctrl";
+		_shortcut = "Shift";
 		setButton(GraphicMoverTool);
 		setCursor(new GraphicMoverTool(0, 0));
 
 		return this;
 	}
-
-	override public function update():Void
+	
+	override public function update():Void 
 	{
-		final key = _brain.macKeyboard ? Keyboard.COMMAND : Keyboard.CONTROL;
 		// Is the tool active or its hotkey pressed?
-		if (!isActive() && !_brain.keyPressed(key) && !_dragging)
+		if (!isActive() && !_brain.keyPressed(Keyboard.SHIFT))
 			return;
-
+		
 		if (_brain.pointerPressed && !_dragging)
-			startDragging();
+			startDragging();	
 		else if (_brain.pointerPressed && _dragging)
 			doDragging();
 		else if (_brain.pointerJustReleased)
 			stopDragging();
-
+		
 		_lastCursorPosition.x = _brain.flixelPointer.x;
 		_lastCursorPosition.y = _brain.flixelPointer.y;
 	}
-
-	function stopDragging():Void
+	
+	private function stopDragging():Void
 	{
 		_dragging = false;
 	}
-
-	function startDragging():Void
+	
+	private function startDragging():Void
 	{
 		if (_dragging)
 			return;
-
+			
 		_dragging = true;
-
+		
 		// If we are not active, it means things are being moved around using
 		// the mover's shortcut key. If the pointer is the active tool, it should
 		// not do any selection of items while things are being moved/dragged.
-		if (!isActive() && (_brain.activeTool is Pointer))
-			(cast _brain.activeTool : Pointer).cancelSelection();
+		if (!isActive() && Std.is(_brain.activeTool, Pointer))
+			cast(_brain.activeTool, Pointer).cancelSelection();
 	}
-
-	function doDragging():Void
+	
+	private function doDragging():Void
 	{
 		var dx:Float = _brain.flixelPointer.x - _lastCursorPosition.x;
 		var dy:Float = _brain.flixelPointer.y - _lastCursorPosition.y;
-
+		
 		for (member in _brain.selectedItems.members)
 		{
-			if (!(member is FlxObject))
+			if (!Std.is(member, FlxObject))
 				continue;
 
 			var object:FlxObject = cast member;

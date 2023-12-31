@@ -1,21 +1,22 @@
 package flixel.system;
 
-import openfl.events.Event;
-import openfl.media.Sound;
-import openfl.media.SoundChannel;
-import openfl.media.SoundTransform;
-import openfl.net.URLRequest;
-import openfl.utils.ByteArray;
+import flash.events.Event;
+import flash.media.Sound;
+import flash.media.SoundChannel;
+import flash.media.SoundTransform;
+import flash.net.URLRequest;
 import flixel.FlxBasic;
 import flixel.FlxG;
-import flixel.system.FlxAssets.FlxSoundAsset;
-import flixel.tweens.FlxTween;
 import flixel.math.FlxMath;
 import flixel.math.FlxPoint;
+import flixel.system.FlxAssets.AssetType;
+import flixel.system.FlxAssets.FlxSoundAsset;
+import flixel.tweens.FlxTween;
+import flixel.util.FlxStringUtil;
 import openfl.Assets;
 
-#if !FLX_NO_SOUND_SYSTEM
-import flixel.system.frontEnds.SoundFrontEnd;
+#if flash11
+import flash.utils.ByteArray;
 #end
 
 /**
@@ -24,12 +25,12 @@ import flixel.system.frontEnds.SoundFrontEnd;
 class FlxSound extends FlxBasic
 {
 	/**
-	 * The X position of this sound in world coordinates.
+	 * The x position of this sound in world coordinates.
 	 * Only really matters if you are doing proximity/panning stuff.
 	 */
 	public var x:Float;
 	/**
-	 * The Y position of this sound in world coordinates.
+	 * The y position of this sound in world coordinates.
 	 * Only really matters if you are doing proximity/panning stuff.
 	 */
 	public var y:Float;
@@ -38,31 +39,31 @@ class FlxSound extends FlxBasic
 	 */
 	public var persist:Bool;
 	/**
-	 * The ID3 song name.  Defaults to null.  Currently only works for streamed sounds.
+	 * The ID3 song name. Defaults to null. Currently only works for streamed sounds.
 	 */
-	public var name:String;
+	public var name(default, null):String;
 	/**
-	 * The ID3 artist name.  Defaults to null.  Currently only works for streamed sounds.
+	 * The ID3 artist name. Defaults to null. Currently only works for streamed sounds.
 	 */
-	public var artist:String;
+	public var artist(default, null):String;
 	/**
 	 * Stores the average wave amplitude of both stereo channels
 	 */
-	public var amplitude:Float;
+	public var amplitude(default, null):Float;
 	/**
 	 * Just the amplitude of the left stereo channel
 	 */
-	public var amplitudeLeft:Float;
+	public var amplitudeLeft(default, null):Float;
 	/**
 	 * Just the amplitude of the left stereo channel
 	 */
-	public var amplitudeRight:Float;
+	public var amplitudeRight(default, null):Float;
 	/**
-	 * Whether to call destroy() when the sound has finished.
+	 * Whether to call `destroy()` when the sound has finished playing.
 	 */
 	public var autoDestroy:Bool;
 	/**
-	 * Tracker for sound complete callback. Default is null. If assigend, will be called 
+	 * Tracker for sound complete callback. If assigned, will be called 
 	 * each time when sound reaches its end. Works only on flash and desktop targets.
 	 */
 	public var onComplete:Void->Void;
@@ -78,14 +79,46 @@ class FlxSound extends FlxBasic
 	 * Set volume to a value between 0 and 1 to change how this sound is.
 	 */
 	public var volume(get, set):Float;
+	#if (sys && openfl_legacy)
 	/**
-	 * The position in runtime of the music playback.
+	 * Set pitch, which also alters the playback speed. Default is 1.
 	 */
-	public var time(default, null):Float;
+	public var pitch(get, set):Float;
+	#end
+	/**
+	 * The position in runtime of the music playback in milliseconds.
+	 * If set while paused, changes only come into effect after a `resume()` call.
+	 */
+	public var time(get, set):Float;
+	/**
+	 * The length of the sound in milliseconds.
+	 * @since 4.2.0
+	 */
+	public var length(get, never):Float;
+	/**
+	 * The sound group this sound belongs to
+	 */
+	public var group(default, set):FlxSoundGroup;
 	/**
 	 * Whether or not this sound should loop.
 	 */
-	public var looped(get, set):Bool;
+	public var looped:Bool;
+	/**
+	 * In case of looping, the point (in milliseconds) from where to restart the sound when it loops back
+	 * @since 4.1.0
+	 */
+	public var loopTime:Float = 0;
+	/**
+	 * At which point to stop playing the sound, in milliseconds.
+	 * If not set / `null`, the sound completes normally.
+	 * @since 4.2.0
+	 */
+	public var endTime:Null<Float>;
+	/**
+	 * The tween used to fade this sound's volume in and out (set via `fadeIn()` and `fadeOut()`)
+	 * @since 4.1.0
+	 */
+	public var fadeTween:FlxTween;
 	/**
 	 * Internal tracker for a Flash sound object.
 	 */
@@ -107,6 +140,20 @@ class FlxSound extends FlxBasic
 	 */
 	private var _volume:Float;
 	/**
+	 * Internal tracker for sound channel position.
+	 */
+	private var _time:Float = 0;
+	/**
+	 * Internal tracker for sound length, so that length can still be obtained while a sound is paused, because _sound becomes null.
+	 */
+	private var _length:Float = 0;
+	#if (sys && openfl_legacy)
+	/**
+	 * Internal tracker for pitch.
+	 */
+	private var _pitch:Float = 1.0;
+	#end
+	/**
 	 * Internal tracker for total volume adjustment.
 	 */
 	private var _volumeAdjust:Float = 1.0;
@@ -126,10 +173,6 @@ class FlxSound extends FlxBasic
 	 * Helper var to prevent the sound from playing after focus was regained when it was already paused.
 	 */
 	private var _alreadyPaused:Bool = false;
-	/**
-	 * Internal tracker for looped state.
-	 */
-	private var _looped:Bool = false;
 	
 	/**
 	 * The FlxSound constructor gets all the variables initialized, but NOT ready to play a sound yet.
@@ -150,11 +193,13 @@ class FlxSound extends FlxBasic
 		x = 0;
 		y = 0;
 		
-		time = 0;
+		_time = 0;
 		_paused = false;
 		_volume = 1.0;
 		_volumeAdjust = 1.0;
-		_looped = false;
+		looped = false;
+		loopTime = 0.0;
+		endTime = 0.0;
 		_target = null;
 		_radius = 0;
 		_proximityPan = false;
@@ -165,9 +210,7 @@ class FlxSound extends FlxBasic
 		autoDestroy = false;
 		
 		if (_transform == null)
-		{
 			_transform = new SoundTransform();
-		}
 		_transform.pan = 0;
 	}
 	
@@ -201,43 +244,31 @@ class FlxSound extends FlxBasic
 	/**
 	 * Handles fade out, fade in, panning, proximity, and amplitude operations each frame.
 	 */
-	override public function update():Void
+	override public function update(elapsed:Float):Void
 	{
 		if (!playing)
-		{
 			return;
-		}
 		
-		time = _channel.position;
+		_time = _channel.position;
 		
 		var radialMultiplier:Float = 1.0;
-		var fadeMultiplier:Float = 1.0;
 		
-		//Distance-based volume control
+		// Distance-based volume control
 		if (_target != null)
 		{
-			radialMultiplier = FlxMath.getDistance(FlxPoint.get(_target.x, _target.y), FlxPoint.get(x, y)) / _radius;
-			if (radialMultiplier < 0) radialMultiplier = 0;
-			if (radialMultiplier > 1) radialMultiplier = 1;
-			
-			radialMultiplier = 1 - radialMultiplier;
+			var targetPosition = _target.getPosition();
+			radialMultiplier = targetPosition.distanceTo(FlxPoint.weak(x, y)) / _radius;
+			targetPosition.put();
+			radialMultiplier = 1 - FlxMath.bound(radialMultiplier, 0, 1);
 			
 			if (_proximityPan)
 			{
 				var d:Float = (x - _target.x) / _radius;
-				if (d < -1) 
-				{
-					d = -1;
-				}
-				else if (d > 1) 
-				{
-					d = 1;
-				}
-				_transform.pan = d;
+				_transform.pan = FlxMath.bound(d, -1, 1);
 			}
 		}
 		
-		_volumeAdjust = radialMultiplier * fadeMultiplier;
+		_volumeAdjust = radialMultiplier;
 		updateTransform();
 		
 		if (_transform.volume > 0)
@@ -250,8 +281,11 @@ class FlxSound extends FlxBasic
 		{
 			amplitudeLeft = 0;
 			amplitudeRight = 0;
-			amplitude = 0;			
+			amplitude = 0;
 		}
+		
+		if (endTime != null && _time >= endTime) 
+			stopped();
 	}
 	
 	override public function kill():Void
@@ -261,16 +295,19 @@ class FlxSound extends FlxBasic
 	}
 	
 	/**
-	 * One of two main setup functions for sounds, this function loads a sound from an embedded MP3.
+	 * One of the main setup functions for sounds, this function loads a sound from an embedded MP3.
 	 * 
 	 * @param	EmbeddedSound	An embedded Class object representing an MP3 file.
 	 * @param	Looped			Whether or not this sound should loop endlessly.
-	 * @param	AutoDestroy		Whether or not this FlxSound instance should be destroyed when the sound finishes playing.  Default value is false, but FlxG.sound.play() and FlxG.sound.stream() will set it to true by default.
-	 * 
+	 * @param	AutoDestroy		Whether or not this FlxSound instance should be destroyed when the sound finishes playing. 
+	 * 							Default value is false, but `FlxG.sound.play()` and `FlxG.sound.stream()` will set it to true by default.
 	 * @return	This FlxSound instance (nice for chaining stuff together, if you're into that).
 	 */
 	public function loadEmbedded(EmbeddedSound:FlxSoundAsset, Looped:Bool = false, AutoDestroy:Bool = false, ?OnComplete:Void->Void):FlxSound
 	{
+		if (EmbeddedSound == null)
+			return this;
+		
 		cleanup(true);
 		
 		if (Std.is(EmbeddedSound, Sound))
@@ -283,25 +320,24 @@ class FlxSound extends FlxBasic
 		}
 		else if (Std.is(EmbeddedSound, String))
 		{
-			_sound = Assets.getSound(EmbeddedSound);
+			if (Assets.exists(EmbeddedSound, AssetType.SOUND) ||
+				Assets.exists(EmbeddedSound, AssetType.MUSIC))
+				_sound = Assets.getSound(EmbeddedSound);
+			else
+				FlxG.log.error('Could not find a Sound asset with an ID of \'$EmbeddedSound\'.');
 		}
 		
-		//NOTE: can't pull ID3 info from embedded sound currently
-		_looped = Looped; 
-		autoDestroy = AutoDestroy;
-		updateTransform();
-		exists = true;
-		onComplete = OnComplete;
-		return this;
+		// NOTE: can't pull ID3 info from embedded sound currently
+		return init(Looped, AutoDestroy, OnComplete);
 	}
 	
 	/**
-	 * One of two main setup functions for sounds, this function loads a sound from a URL.
+	 * One of the main setup functions for sounds, this function loads a sound from a URL.
 	 * 
-	 * @param	EmbeddedSound	A string representing the URL of the MP3 file you want to play.
+	 * @param	SoundURL		A string representing the URL of the MP3 file you want to play.
 	 * @param	Looped			Whether or not this sound should loop endlessly.
-	 * @param	AutoDestroy		Whether or not this FlxSound instance should be destroyed when the sound finishes playing.  Default value is false, but FlxG.sound.play() and FlxG.sound.stream() will set it to true by default.
-	 * 
+	 * @param	AutoDestroy		Whether or not this FlxSound instance should be destroyed when the sound finishes playing.
+	 * 							Default value is false, but `FlxG.sound.play()` and `FlxG.sound.stream()` will set it to true by default.
 	 * @return	This FlxSound instance (nice for chaining stuff together, if you're into that).
 	 */
 	public function loadStream(SoundURL:String, Looped:Bool = false, AutoDestroy:Bool = false, ?OnComplete:Void->Void):FlxSound
@@ -311,12 +347,8 @@ class FlxSound extends FlxBasic
 		_sound = new Sound();
 		_sound.addEventListener(Event.ID3, gotID3);
 		_sound.load(new URLRequest(SoundURL));
-		_looped = Looped;
-		autoDestroy = AutoDestroy;
-		updateTransform();
-		exists = true;
-		onComplete = OnComplete;
-		return this;
+
+		return init(Looped, AutoDestroy, OnComplete);
 	}
 	
 	#if flash11
@@ -325,28 +357,33 @@ class FlxSound extends FlxBasic
 	 * 
 	 * @param	Bytes 			A ByteArray object.
 	 * @param	Looped			Whether or not this sound should loop endlessly.
-	 * @param	AutoDestroy		Whether or not this FlxSound instance should be destroyed when the sound finishes playing.  Default value is false, but FlxG.sound.play() and FlxG.sound.stream() will set it to true by default.
+	 * @param	AutoDestroy		Whether or not this FlxSound instance should be destroyed when the sound finishes playing.
+	 * 							Default value is false, but `FlxG.sound.play()` and `FlxG.sound.stream()` will set it to true by default.
 	 * @return	This FlxSound instance (nice for chaining stuff together, if you're into that).
 	 */
 	public function loadByteArray(Bytes:ByteArray, Looped:Bool = false, AutoDestroy:Bool = false, ?OnComplete:Void->Void):FlxSound
 	{
 		cleanup(true);
 		
-		#if js
-		onComplete();
-		#else
 		_sound = new Sound();
 		_sound.addEventListener(Event.ID3, gotID3);
 		_sound.loadCompressedDataFromByteArray(Bytes, Bytes.length);
-		_looped = Looped;
+		
+		return init(Looped, AutoDestroy, OnComplete);
+	}
+	#end
+
+	private function init(Looped:Bool = false, AutoDestroy:Bool = false, ?OnComplete:Void->Void):FlxSound
+	{
+		looped = Looped;
 		autoDestroy = AutoDestroy;
 		updateTransform();
 		exists = true;
 		onComplete = OnComplete;
-		#end
-		return this;	
+		_length = (_sound == null) ? 0 : _sound.length;
+		endTime = _length;
+		return this;
 	}
-	#end
 	
 	/**
 	 * Call this function if you want this sound's volume to change
@@ -356,7 +393,7 @@ class FlxSound extends FlxBasic
 	 * @param	Y			The Y position of the sound.
 	 * @param	TargetObject		The object you want to track.
 	 * @param	Radius			The maximum distance this sound can travel.
-	 * @param	Pan			Whether panning should be used in addition to the volume changes (default: true).
+	 * @param	Pan			Whether panning should be used in addition to the volume changes.
 	 * @return	This FlxSound instance (nice for chaining stuff together, if you're into that).
 	 */
 	public function proximity(X:Float, Y:Float, TargetObject:FlxObject, Radius:Float, Pan:Bool = true):FlxSound
@@ -372,44 +409,40 @@ class FlxSound extends FlxBasic
 	/**
 	 * Call this function to play the sound - also works on paused sounds.
 	 * 
-	 * @param	ForceRestart	Whether to start the sound over or not.  Default value is false, meaning if the sound is already playing or was paused when you call play(), it will continue playing from its current position, NOT start again from the beginning.
+	 * @param   ForceRestart   Whether to start the sound over or not. 
+	 *                         Default value is false, meaning if the sound is already playing or was
+	 *                         paused when you call play(), it will continue playing from its current
+	 *                         position, NOT start again from the beginning.
+	 * @param   StartTime      At which point to start playing the sound, in milliseconds.
+	 * @param   EndTime        At which point to stop playing the sound, in milliseconds.
+	 *                         If not set / `null`, the sound completes normally.
 	 */
-	public function play(ForceRestart:Bool = false):FlxSound
+	public function play(ForceRestart:Bool = false, StartTime:Float = 0.0, ?EndTime:Float):FlxSound
 	{
 		if (!exists)
-		{
 			return this;
-		}
+
 		if (ForceRestart)
-		{
-			cleanup(false, true, true);
-		}
-		else if (playing)
-		{
-			// Already playing sound
+			cleanup(false, true);
+		else if (playing) // Already playing sound
 			return this;
-		}
 		
 		if (_paused)
-		{
 			resume();
-		}
 		else
-		{
-			startSound(0);
-		}
+			startSound(StartTime);
+		
+		endTime = EndTime;
 		return this;
 	}
 	
 	/**
-	 * Unpause a sound.  Only works on sounds that have been paused.
+	 * Unpause a sound. Only works on sounds that have been paused.
 	 */
 	public function resume():FlxSound
 	{
 		if (_paused)
-		{
-			startSound(time);
-		}
+			startSound(_time);
 		return this;
 	}
 	
@@ -419,12 +452,11 @@ class FlxSound extends FlxBasic
 	public function pause():FlxSound
 	{
 		if (!playing)
-		{
 			return this;
-		}
-		time = _channel.position;
+
+		_time = _channel.position;
 		_paused = true;
-		cleanup(false, false, false);
+		cleanup(false, false);
 		return this;
 	}
 	
@@ -433,7 +465,7 @@ class FlxSound extends FlxBasic
 	 */
 	public inline function stop():FlxSound
 	{
-		cleanup(autoDestroy, true, true);
+		cleanup(autoDestroy, true);
 		return this;
 	}
 	
@@ -443,9 +475,12 @@ class FlxSound extends FlxBasic
 	 * @param	Duration	The amount of time the fade-out operation should take.
 	 * @param	To			The volume to tween to, 0 by default.
 	 */
-	public inline function fadeOut(Duration:Float = 1, ?To:Float = 0):FlxSound
+	public inline function fadeOut(Duration:Float = 1, ?To:Float = 0, ?onComplete:FlxTween->Void):FlxSound
 	{
-		FlxTween.num(volume, To, Duration, null, volumeTween);
+		if (fadeTween != null)
+			fadeTween.cancel();
+		fadeTween = FlxTween.num(volume, To, Duration, { onComplete: onComplete }, volumeTween);
+		
 		return this;
 	}
 	
@@ -456,9 +491,15 @@ class FlxSound extends FlxBasic
 	 * @param	From		The volume to tween from, 0 by default.
 	 * @param	To			The volume to tween to, 1 by default.
 	 */
-	public inline function fadeIn(Duration:Float = 1, From:Float = 0, To:Float = 1):FlxSound
+	public inline function fadeIn(Duration:Float = 1, From:Float = 0, To:Float = 1, ?onComplete:FlxTween->Void):FlxSound
 	{
-		FlxTween.num(From, To, Duration, null, volumeTween);
+		if (!playing)
+			play();
+
+		if (fadeTween != null)
+			fadeTween.cancel();
+
+		fadeTween = FlxTween.num(From, To, Duration, { onComplete: onComplete }, volumeTween);
 		return this;
 	}
 	
@@ -483,7 +524,7 @@ class FlxSound extends FlxBasic
 	 * 
 	 * @param        X        The new x position
 	 * @param        Y        The new y position
- 	 */
+	 */
 	public inline function setPosition(X:Float = 0, Y:Float = 0):Void
 	{
 		x = X;
@@ -493,31 +534,36 @@ class FlxSound extends FlxBasic
 	/**
 	 * Call after adjusting the volume to update the sound channel's settings.
 	 */
+	@:allow(flixel.system.FlxSoundGroup)
 	private function updateTransform():Void
 	{
-		#if !FLX_NO_SOUND_SYSTEM
-		_transform.volume = (FlxG.sound.muted ? 0 : 1) * FlxG.sound.volume * _volume * _volumeAdjust;
-		#else
-		_transform.volume = _volume * _volumeAdjust;
+		_transform.volume =
+		#if FLX_SOUND_SYSTEM
+			(FlxG.sound.muted ? 0 : 1) * FlxG.sound.volume *
 		#end
+			(group != null ? group.volume : 1) * _volume * _volumeAdjust;
+		
 		if (_channel != null)
-		{
 			_channel.soundTransform = _transform;
-		}
 	}
 	
 	/**
-	 * An internal helper function used to attempt to start playing the sound and populate the _channel variable.
+	 * An internal helper function used to attempt to start playing
+	 * the sound and populate the _channel variable.
 	 */
-	private function startSound(Position:Float):Void
+	private function startSound(StartTime:Float):Void
 	{
-		var numLoops:Int = _looped ? FlxMath.MAX_VALUE_INT : 0;
+		if (_sound == null)
+			return;
 		
-		time = Position;
+		_time = StartTime;
 		_paused = false;
-		_channel = _sound.play(time, numLoops, _transform);
+		_channel = _sound.play(_time, 0, _transform);
 		if (_channel != null)
 		{
+			#if (sys && openfl_legacy)
+			pitch = _pitch;
+			#end
 			_channel.addEventListener(Event.SOUND_COMPLETE, stopped);
 			active = true;
 		}
@@ -529,36 +575,33 @@ class FlxSound extends FlxBasic
 	}
 	
 	/**
-	 * An internal helper function used to help Flash clean up finished sounds or restart looped sounds.
-	 * 
-	 * @param	event		An Event object.
+	 * An internal helper function used to help Flash
+	 * clean up finished sounds or restart looped sounds.
 	 */
-	private function stopped(event:Event = null):Void
+	private function stopped(?_):Void
 	{
 		if (onComplete != null)
-		{
 			onComplete();
-		}
 		
-		if (_looped)
+		if (looped)
 		{
 			cleanup(false);
-			play();
+			play(false, loopTime, endTime);
 		}
 		else
-		{
 			cleanup(autoDestroy);
-		}
 	}
 	
 	/**
-	 * An internal helper function used to help Flash clean up (and potentially re-use) finished sounds. Will stop the current sound and destroy the associated SoundChannel, plus, any other commands ordered by the passed in parameters.
+	 * An internal helper function used to help Flash clean up (and potentially re-use) finished sounds.
+	 * Will stop the current sound and destroy the associated SoundChannel, plus,
+	 * any other commands ordered by the passed in parameters.
 	 * 
-	 * @param  destroySound    Whether or not to destroy the sound. If this is true, the position and fading will be reset as well.
-	 * @param  resetPosition    Whether or not to reset the position of the sound.
-	 * @param  resetFading    Whether or not to reset the current fading variables of the sound.
+	 * @param  destroySound    Whether or not to destroy the sound. If this is true,
+	 *                         the position and fading will be reset as well.
+	 * @param  resetPosition   Whether or not to reset the position of the sound.
 	 */
-	private function cleanup(destroySound:Bool, resetPosition:Bool = true, resetFading:Bool = true):Void
+	private function cleanup(destroySound:Bool, resetPosition:Bool = true):Void
 	{
 		if (destroySound)
 		{
@@ -577,31 +620,27 @@ class FlxSound extends FlxBasic
 
 		if (resetPosition)
 		{
-			time = 0;
+			_time = 0;
 			_paused = false;
 		}
 	}
 	
 	/**
 	 * Internal event handler for ID3 info (i.e. fetching the song name).
-	 * @param	event	An Event object.
 	 */
-	private function gotID3(?event:Event):Void
+	private function gotID3(_):Void
 	{
-		FlxG.log.notice("Got ID3 info.");
 		name = _sound.id3.songName;
 		artist = _sound.id3.artist;
 		_sound.removeEventListener(Event.ID3, gotID3);
 	}
 	
-	#if !FLX_NO_SOUND_SYSTEM
+	#if FLX_SOUND_SYSTEM
 	@:allow(flixel.system.frontEnds.SoundFrontEnd)
 	private function onFocus():Void
 	{
 		if (!_alreadyPaused)
-		{
 			resume();
-		}
 	}
 	
 	@:allow(flixel.system.frontEnds.SoundFrontEnd)
@@ -612,9 +651,29 @@ class FlxSound extends FlxBasic
 	}
 	#end
 	
+	private function set_group(group:FlxSoundGroup):FlxSoundGroup
+	{	
+		if (this.group != group)
+		{
+			var oldGroup:FlxSoundGroup = this.group;
+			
+			// New group must be set before removing sound to prevent infinite recursion
+			this.group = group;
+			
+			if (oldGroup != null)
+				oldGroup.remove(this);
+			
+			if (group != null)
+				group.add(this);
+			
+			updateTransform();
+		}
+		return group;
+	}
+	
 	private inline function get_playing():Bool
 	{
-		return (_channel != null);
+		return _channel != null;
 	}
 	
 	private inline function get_volume():Float
@@ -629,6 +688,20 @@ class FlxSound extends FlxBasic
 		return Volume;
 	}
 	
+	#if (sys && openfl_legacy)
+	private inline function get_pitch():Float
+	{
+		return _pitch;
+	}
+	
+	private function set_pitch(v:Float):Float
+	{
+		if (_channel != null)
+			_channel.pitch = v;
+		return _pitch = v;
+	}
+	#end
+	
 	private inline function get_pan():Float
 	{
 		return _transform.pan;
@@ -639,28 +712,32 @@ class FlxSound extends FlxBasic
 		return _transform.pan = pan;
 	}
 	
-	private inline function get_looped():Bool
+	private inline function get_time():Float
 	{
-		return _looped;
+		return _time;
 	}
 	
-	private inline function set_looped(loop:Bool):Bool
+	private function set_time(time:Float):Float
 	{
-		// If we're going from looping to not looping while playing,
-		// the channel needs to be updated so it won't loop next time.
-		
-		if (!loop && _looped && playing)
+		if (playing)
 		{
-			_looped = loop;
-			var pos:Float = _channel.position;
-			cleanup(false, false, false);
-			startSound(pos);
+			cleanup(false, true);
+			startSound(time);
 		}
-		else
-		{
-			_looped = loop;
-		}
-		
-		return loop;
+		return _time = time;
+	}
+
+	private inline function get_length():Float
+	{
+		return _length;
+	}
+	
+	override public function toString():String
+	{
+		return FlxStringUtil.getDebugString([
+			LabelValuePair.weak("playing", playing),
+			LabelValuePair.weak("time", time),
+			LabelValuePair.weak("length", length),
+			LabelValuePair.weak("volume", volume)]);
 	}
 }

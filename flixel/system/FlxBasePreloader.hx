@@ -1,29 +1,30 @@
 package flixel.system;
 
-#if !doc
-#if js
-class FlxBasePreloader extends NMEPreloader {}
-#else
-import openfl.events.Event;
-import openfl.Lib;
-import openfl.display.StageAlign;
-import openfl.display.StageScaleMode;
-import openfl.events.MouseEvent;
-import openfl.display.Bitmap;
-import openfl.display.BitmapData;
-import openfl.net.URLRequest;
-import openfl.text.TextField;
-import openfl.text.TextFormat;
-import openfl.text.TextFormatAlign;
+import flash.display.Bitmap;
+import flash.display.BitmapData;
+import flash.display.StageAlign;
+import flash.display.StageScaleMode;
+import flash.events.Event;
+import flash.events.MouseEvent;
+import flash.Lib;
+import flash.net.URLRequest;
+import flash.text.TextField;
+import flash.text.TextFormat;
+import flash.text.TextFormatAlign;
 import flixel.util.FlxColor;
 import flixel.util.FlxStringUtil;
+import openfl.events.ProgressEvent;
 
-class FlxBasePreloader extends NMEPreloader
-{	
+#if (openfl >= "4.5.0")
+import openfl.display.Preloader.DefaultPreloader;
+#end
+
+class FlxBasePreloader extends #if (openfl < "4.5.0") NMEPreloader #else DefaultPreloader #end
+{
 	/**
 	 * Add this string to allowedURLs array if you want to be able to test game with enabled site-locking on local machine 
 	 */
-	public static inline var LOCAL:String = "local";
+	public static inline var LOCAL:String = #if flash "local" #else "localhost" #end;
 	
 	/**
 	 * Change this if you want the flixel logo to show for more or less time.  Default value is 0 seconds (no delay).
@@ -32,16 +33,16 @@ class FlxBasePreloader extends NMEPreloader
 	
 	/**
 	 * List of allowed URLs for built-in site-locking.
-	 * Set it in FlxPreloader's constructor as: ['http://adamatomic.com/canabalt/', FlxPreloader.LOCAL];
+	 * Set it in FlxPreloader's constructor as: `['http://adamatomic.com/canabalt/', FlxPreloader.LOCAL]`;
 	 */
 	public var allowedURLs:Array<String>;
 
 	/**
-	* The index of which URL in allowedURLs will be triggered when a user clicks on the Site-lock Message.
-	* For example, if allowedURLs is ['mysite.com', 'othersite.com'], and siteLockURLIndex = 1, then
-	* the user will go to 'othersite.com' when they click the message, but sitelocking will allow either of those URLs to work.
-	* Defaults to 0.
-	*/
+	 * The index of which URL in allowedURLs will be triggered when a user clicks on the Site-lock Message.
+	 * For example, if allowedURLs is `['mysite.com', 'othersite.com']`, and `siteLockURLIndex = 1`, then
+	 * the user will go to 'othersite.com' when they click the message, but sitelocking will allow either of those URLs to work.
+	 * Defaults to 0.
+	 */
 	public var siteLockURLIndex:Int = 0;
 	
 	private var _percent:Float = 0;
@@ -49,10 +50,11 @@ class FlxBasePreloader extends NMEPreloader
 	private var _height:Int;
 	private var _loaded:Bool = false;
 	private var _urlChecked:Bool = false;
+	private var _startTime:Float;
 	
 	/**
-	 * FlxPreloaderBase Constructor.
-	 * @param	MinDisplayTime	Minimum time the preloader should be shown. (Default = 0)
+	 * FlxBasePreloader Constructor.
+	 * @param	MinDisplayTime	Minimum time (in seconds) the preloader should be shown. (Default = 0)
 	 * @param	AllowedURLs		Allowed URLs used for Site-locking. If the game is run anywhere else, a message will be displayed on the screen (Default = [])
 	 */
 	public function new(MinDisplayTime:Float = 0, ?AllowedURLs:Array<String>)
@@ -67,6 +69,8 @@ class FlxBasePreloader extends NMEPreloader
 			allowedURLs = AllowedURLs;
 		else
 			allowedURLs = [];
+		
+		_startTime = Date.now().getTime();
 	}
 	
 	/**
@@ -80,12 +84,12 @@ class FlxBasePreloader extends NMEPreloader
 	override public function onInit() 
 	{
 		super.onInit();
+		
 		Lib.current.stage.scaleMode = StageScaleMode.NO_SCALE;
 		Lib.current.stage.align = StageAlign.TOP_LEFT;
 		create();
-		checkSiteLock();
 		addEventListener(Event.ENTER_FRAME, onEnterFrame);
-
+		checkSiteLock();
 	}
 	
 	/**
@@ -94,27 +98,32 @@ class FlxBasePreloader extends NMEPreloader
 	 */
 	override public function onUpdate(bytesLoaded:Int, bytesTotal:Int) 
 	{
-		#if !(desktop || mobile)
+		#if flash
 		if (root.loaderInfo.bytesTotal == 0)
 			bytesTotal = 50000;
-		_percent = (bytesTotal != 0)?bytesLoaded / bytesTotal : 0;
+		#end
+		
+		#if web
+		_percent = (bytesTotal != 0) ? bytesLoaded / bytesTotal : 0;
+		#else
+		super.onUpdate(bytesLoaded, bytesTotal);
 		#end
 	}
 	
 	/**
 	 * This function is triggered on each 'frame'.
-	 * It is highly reccommended that you do NOT override this.
+	 * It is highly recommended that you do NOT override this.
 	 */
 	private function onEnterFrame(E:Event):Void
 	{
-		var time:Int = Lib.getTimer();
-		var min:Int = Std.int(minDisplayTime * 1000);
+		var time = Date.now().getTime() - _startTime;
+		var min = minDisplayTime * 1000;
 		var percent:Float = _percent;
 		if ((min > 0) && (_percent > time / min))
 			percent = time / min;
 		update(percent);
 		
-		if (_loaded && (min <= 0 || time/min >= 1))
+		if (_loaded && (min <= 0 || time / min >= 1))
 		{
 			removeEventListener(Event.ENTER_FRAME, onEnterFrame);
 			super.onLoaded();
@@ -126,29 +135,68 @@ class FlxBasePreloader extends NMEPreloader
 	 * This function is called when the project has finished loading.
 	 * Override it to remove all of your objects.
 	 */
-	private function destroy():Void
-	{
-		
-	}
+	private function destroy():Void {}
 	
 	/**
 	 * Override to draw your preloader objects in response to the Percent
 	 * 
 	 * @param	Percent		How much of the program has loaded.
 	 */
-	private function update(Percent:Float):Void
-	{
-		
-	}
+	function update(Percent:Float):Void {}
 	
 	/**
 	 * This function is called EXTERNALLY once the movie has actually finished being loaded. 
 	 * Highly recommended you DO NO override.
 	 */
 	override public function onLoaded() 
-	{	
+	{
 		_loaded = true;
 		_percent = 1;
+	}
+	
+	/**
+	 * This should be used whenever you want to create a Bitmap that uses BitmapData embedded with the
+	 * @:bitmap metadata, if you want to support both Flash and HTML5. Because the embedded data is loaded
+	 * asynchronously in HTML5, any code that depends on the pixel data or size of the bitmap should be
+	 * in the onLoad function; any such code executed before it is called will fail on the HTML5 target.
+	 * 
+	 * @param	bitmapDataClass		A reference to the BitmapData child class that contains the embedded data which is to be used.
+	 * @param	onLoad				Executed once the bitmap data is finished loading in HTML5, and immediately in Flash. The new Bitmap instance is passed as an argument.
+	 * @return  The Bitmap instance that was created.
+	 */
+	private function createBitmap(bitmapDataClass:Class<BitmapData>, onLoad:Bitmap->Void):Bitmap
+	{
+		#if html5
+		var bmp = new Bitmap();
+		bmp.bitmapData = Type.createInstance(bitmapDataClass, [0, 0, true, 0xFFFFFFFF, function(_) onLoad(bmp)]);
+		return bmp;
+		#else
+		var bmp = new Bitmap(Type.createInstance(bitmapDataClass, [0, 0]));
+		onLoad(bmp);
+		return bmp;
+		#end
+	}
+	
+	/**
+	 * This should be used whenever you want to create a BitmapData object from a class containing data embedded with
+	 * the @:bitmap metadata. Often, you'll want to use the BitmapData in a Bitmap object; in this case, createBitmap()
+	 * can should be used instead. Because the embedded data is loaded asynchronously in HTML5, any code that depends on
+	 * the pixel data or size of the bitmap should be in the onLoad function; any such code executed before it is called
+	 * will fail on the HTML5 target.
+	 * 
+	 * @param	bitmapDataClass		A reference to the BitmapData child class that contains the embedded data which is to be used.
+	 * @param	onLoad				Executed once the bitmap data is finished loading in HTML5, and immediately in Flash. The new BitmapData instance is passed as an argument.
+	 * @return  The BitmapData instance that was created.
+	 */
+	private function loadBitmapData(bitmapDataClass:Class<BitmapData>, onLoad:BitmapData->Void):BitmapData
+	{
+		#if html5
+		return Type.createInstance(bitmapDataClass, [0, 0, true, 0xFFFFFFFF, onLoad]);
+		#else
+		var bmpData = Type.createInstance(bitmapDataClass, [0, 0]);
+		onLoad(bmpData);
+		return bmpData;
+		#end
 	}
 	
 	/**
@@ -156,7 +204,7 @@ class FlxBasePreloader extends NMEPreloader
 	 */
 	private function checkSiteLock():Void
 	{
-		#if flash
+		#if web
 		if (!_urlChecked && (allowedURLs != null))
 		{
 			if (!isHostUrlAllowed())
@@ -194,7 +242,7 @@ class FlxBasePreloader extends NMEPreloader
 		#end
 	}
 	
-	#if flash
+	#if web
 	private function goToMyURL(?e:MouseEvent):Void
 	{
 		//if the chosen URL isn't "local", use FlxG's openURL() function.
@@ -211,14 +259,14 @@ class FlxBasePreloader extends NMEPreloader
 			return true;
 		}
 		
-		var homeDomain:String = FlxStringUtil.getDomain(loaderInfo.loaderURL);
+		var homeDomain:String = FlxStringUtil.getDomain(#if flash loaderInfo.loaderURL #elseif js js.Browser.location.href #end);
 		for (allowedURL in allowedURLs)
 		{
 			if (FlxStringUtil.getDomain(allowedURL) == homeDomain)
 			{
 				return true;
 			}
-			else if ((allowedURL == LOCAL) && (homeDomain == LOCAL))
+			else if (allowedURL == LOCAL && homeDomain == LOCAL)
 			{
 				return true;
 			}
@@ -227,6 +275,13 @@ class FlxBasePreloader extends NMEPreloader
 	}
 	#end
 	
+	#if (openfl >= "4.5.0")
+	override private function this_onComplete(event:Event):Void
+	{
+		event.preventDefault();
+		removeEventListener(ProgressEvent.PROGRESS, this_onProgress);
+		removeEventListener(Event.COMPLETE, this_onComplete);
+		onLoaded();
+	}
+	#end
 }
-#end
-#end

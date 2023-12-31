@@ -1,20 +1,21 @@
 package flixel.system.ui;
 
-#if !FLX_NO_SOUND_SYSTEM
-import openfl.display.Bitmap;
-import openfl.display.BitmapData;
-import openfl.display.Sprite;
-import openfl.Lib;
-import openfl.text.AntiAliasType;
-import openfl.text.GridFitType;
-import openfl.text.TextField;
-import openfl.text.TextFormat;
-import openfl.text.TextFormatAlign;
-import flixel.FlxCamera;
+#if FLX_SOUND_SYSTEM
+import flash.display.Bitmap;
+import flash.display.BitmapData;
+import flash.display.Sprite;
+import flash.Lib;
+import flash.text.TextField;
+import flash.text.TextFormat;
+import flash.text.TextFormatAlign;
 import flixel.FlxG;
 import flixel.system.FlxAssets;
-import flixel.system.FlxSound;
 import flixel.util.FlxColor;
+
+#if flash
+import flash.text.AntiAliasType;
+import flash.text.GridFitType;
+#end
 
 /**
  * The flixel sound tray, the little volume meter that pops down sometimes.
@@ -44,6 +45,7 @@ class FlxSoundTray extends Sprite
 	/**
 	 * Sets up the "sound tray", the little volume meter that pops down sometimes.
 	 */
+	@:keep
 	public function new()
 	{
 		super();
@@ -69,7 +71,7 @@ class FlxSoundTray extends Sprite
 		#else
 		
 		#end
-		var dtf:TextFormat = new TextFormat(FlxAssets.FONT_DEFAULT, 8, 0xffffff);
+		var dtf:TextFormat = new TextFormat(FlxAssets.FONT_DEFAULT, 10, 0xffffff);
 		dtf.align = TextFormatAlign.CENTER;
 		text.defaultTextFormat = dtf;
 		addChild(text);
@@ -105,7 +107,7 @@ class FlxSoundTray extends Sprite
 		{
 			_timer -= MS / 1000;
 		}
-		else if (y > - height)
+		else if (y > -height)
 		{
 			y -= (MS / 1000) * FlxG.height * 2;
 			
@@ -131,7 +133,9 @@ class FlxSoundTray extends Sprite
 	{
 		if (!Silent)
 		{
-			FlxG.sound.load(FlxAssets.getSound("assets/sounds/beep")).play();
+			var sound = FlxAssets.getSound("flixel/sounds/beep");
+			if (sound != null)
+				FlxG.sound.load(sound).play();
 		}
 		
 		_timer = 1;
@@ -160,10 +164,10 @@ class FlxSoundTray extends Sprite
 	
 	public function screenCenter():Void
 	{
-		scaleX = _defaultScale / FlxG.game.scaleX;
-		scaleY = _defaultScale / FlxG.game.scaleY;
+		scaleX = _defaultScale;
+		scaleY = _defaultScale;
 		
-		x = (0.5 * (Lib.current.stage.stageWidth - _width * _defaultScale) - FlxG.game.x) / FlxG.game.scaleX;
+		x = (0.5 * (Lib.current.stage.stageWidth - _width * _defaultScale) - FlxG.game.x);
 	}
 }
 #end

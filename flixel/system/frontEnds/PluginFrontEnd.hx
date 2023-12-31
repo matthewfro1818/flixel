@@ -1,11 +1,9 @@
 package flixel.system.frontEnds;
 
 import flixel.tweens.FlxTween;
-import flixel.util.FlxPath;
 import flixel.util.FlxStringUtil;
 import flixel.util.FlxTimer;
 
-@:allow(flixel.FlxGame)
 class PluginFrontEnd
 {
 	/**
@@ -95,7 +93,7 @@ class PluginFrontEnd
 		{
 			if (Std.is(list[i], ClassType))
 			{
-				list.splice(i,1);
+				list.splice(i, 1);
 				results = true;
 			}
 			i--;
@@ -107,21 +105,21 @@ class PluginFrontEnd
 	@:allow(flixel.FlxG)
 	private function new() 
 	{
-		add(FlxPath.manager = new FlxPathManager());
-		add(FlxTimer.manager = new FlxTimerManager());
-		add(FlxTween.manager = new FlxTweenManager());
+		add(FlxTimer.globalManager = new FlxTimerManager());
+		add(FlxTween.globalManager = new FlxTweenManager());
 	}
 	
 	/**
 	 * Used by the game object to call update() on all the plugins.
 	 */
-	private inline function update():Void
+	@:allow(flixel.FlxGame)
+	private inline function update(elapsed:Float):Void
 	{
 		for (plugin in list)
 		{
 			if (plugin.exists && plugin.active)
 			{
-				plugin.update();
+				plugin.update(elapsed);
 			}
 		}
 	}
@@ -129,6 +127,7 @@ class PluginFrontEnd
 	/**
 	 * Used by the game object to call draw() on all the plugins.
 	 */
+	@:allow(flixel.FlxGame)
 	private inline function draw():Void
 	{
 		for (plugin in list)

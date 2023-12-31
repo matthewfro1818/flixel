@@ -1,10 +1,12 @@
 package flixel.system.scaleModes;
 
-import flixel.FlxCamera;
 import flixel.FlxG;
 import flixel.math.FlxPoint;
+import flixel.util.FlxHorizontalAlign;
+import flixel.util.FlxVerticalAlign;
 
-@:allow(flixel.FlxGame)
+// TODO: shader based scale mode (see https://github.com/HaxeFlixel/flixel/pull/1826)
+
 class BaseScaleMode
 {
 	public var deviceSize(default, null):FlxPoint;
@@ -12,7 +14,8 @@ class BaseScaleMode
 	public var scale(default, null):FlxPoint;
 	public var offset(default, null):FlxPoint;
 	
-	private static var zoom:FlxPoint = FlxPoint.get();
+	public var horizontalAlign(default, set):FlxHorizontalAlign = CENTER;
+	public var verticalAlign(default, set):FlxVerticalAlign = CENTER;
 	
 	public function new()
 	{
@@ -24,10 +27,12 @@ class BaseScaleMode
 	
 	public function onMeasure(Width:Int, Height:Int):Void
 	{
+		FlxG.width = FlxG.initialWidth;
+		FlxG.height = FlxG.initialHeight;
+		
 		updateGameSize(Width, Height);
 		updateDeviceSize(Width, Height);
 		updateScaleOffset();
-		updateGameScale();
 		updateGamePosition();
 	}
 	
@@ -43,35 +48,66 @@ class BaseScaleMode
 	
 	private function updateScaleOffset():Void
 	{
-		scale.x = gameSize.x / FlxG.width;
-		scale.y = gameSize.y / FlxG.height;
-		
-		zoom.set(FlxCamera.defaultZoom, FlxCamera.defaultZoom);
-		
-		if (FlxG.camera != null) 
-		{
-			zoom.x = FlxG.camera.getScale().x;
-			zoom.y = FlxG.camera.getScale().y;
-		}
-		
-		scale.x /= zoom.x;
-		scale.y /= zoom.y;
-		
-		offset.x = Math.ceil((deviceSize.x - gameSize.x) * 0.5);
-		offset.y = Math.ceil((deviceSize.y - gameSize.y) * 0.5);
+		scale.x = gameSize.x / (FlxG.width * FlxG.initialZoom);
+		scale.y = gameSize.y / (FlxG.height * FlxG.initialZoom);
+		updateOffsetX();
+		updateOffsetY();
 	}
 	
-	private function updateGameScale():Void
+	private function updateOffsetX():Void
 	{
-		#if !js
-		FlxG.game.scaleX = scale.x;
-		FlxG.game.scaleY = scale.y;
-		#end
+		offset.x = switch (horizontalAlign)
+		{
+			case FlxHorizontalAlign.LEFT:
+				0;
+			case FlxHorizontalAlign.CENTER:
+				Math.ceil((deviceSize.x - gameSize.x) * 0.5);
+			case FlxHorizontalAlign.RIGHT:
+				deviceSize.x - gameSize.x;
+		}
+	}
+	
+	private function updateOffsetY():Void
+	{
+		offset.y = switch (verticalAlign)
+		{
+			case FlxVerticalAlign.TOP:
+				0;
+			case FlxVerticalAlign.CENTER:
+				Math.ceil((deviceSize.y - gameSize.y) * 0.5);
+			case FlxVerticalAlign.BOTTOM:
+				deviceSize.y - gameSize.y;
+		}
 	}
 	
 	private function updateGamePosition():Void
 	{
+		if (FlxG.game == null)
+			return;
+		
 		FlxG.game.x = offset.x;
 		FlxG.game.y = offset.y;
+	}
+	
+	private function set_horizontalAlign(value:FlxHorizontalAlign):FlxHorizontalAlign
+	{
+		horizontalAlign = value;
+		if (offset != null)
+		{
+			updateOffsetX();
+			updateGamePosition();
+		}
+		return value;
+	}
+	
+	private function set_verticalAlign(value:FlxVerticalAlign):FlxVerticalAlign
+	{
+		verticalAlign = value;
+		if (offset != null)
+		{
+			updateOffsetY();
+			updateGamePosition();
+		}
+		return value;
 	}
 }

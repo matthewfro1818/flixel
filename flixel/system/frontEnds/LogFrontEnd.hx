@@ -1,7 +1,7 @@
 package flixel.system.frontEnds;
 
 import flixel.FlxG;
-import flixel.system.debug.LogStyle;
+import flixel.system.debug.log.LogStyle;
 import flixel.system.FlxAssets;
 import haxe.Log;
 import haxe.PosInfos;
@@ -17,28 +17,28 @@ class LogFrontEnd
 	
 	public inline function add(Data:Dynamic):Void
 	{
-		#if !FLX_NO_DEBUG
+		#if FLX_DEBUG
 		advanced(Data, LogStyle.NORMAL); 
 		#end
 	}
 	
 	public inline function warn(Data:Dynamic):Void
 	{
-		#if !FLX_NO_DEBUG
+		#if FLX_DEBUG
 		advanced(Data, LogStyle.WARNING, true); 
 		#end
 	}
 	
 	public inline function error(Data:Dynamic):Void
 	{
-		#if !FLX_NO_DEBUG
+		#if FLX_DEBUG
 		advanced(Data, LogStyle.ERROR, true); 
 		#end
 	}
 	
 	public inline function notice(Data:Dynamic):Void
 	{
-		#if !FLX_NO_DEBUG
+		#if FLX_DEBUG
 		advanced(Data, LogStyle.NOTICE); 
 		#end
 	}
@@ -52,7 +52,7 @@ class LogFrontEnd
 	 */ 
 	public function advanced(Data:Dynamic, ?Style:LogStyle, FireOnce:Bool = false):Void
 	{
-		#if !FLX_NO_DEBUG
+		#if FLX_DEBUG
 		if (FlxG.game.debugger == null)
 		{
 			_standardTraceFunction(Data);
@@ -74,7 +74,11 @@ class LogFrontEnd
 			#if !FLX_NO_SOUND_SYSTEM
 			if (Style.errorSound != null)
 			{
-				FlxG.sound.load(FlxAssets.getSound(Style.errorSound)).play();
+				var sound = FlxAssets.getSound(Style.errorSound); 
+				if (sound != null)
+				{
+					FlxG.sound.load(sound).play();
+				}
 			}
 			#end
 			
@@ -96,7 +100,7 @@ class LogFrontEnd
 	 */
 	public inline function clear():Void
 	{
-		#if !FLX_NO_DEBUG
+		#if FLX_DEBUG
 		FlxG.game.debugger.log.clear();
 		#end
 	}

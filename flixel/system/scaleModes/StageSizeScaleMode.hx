@@ -9,7 +9,7 @@ class StageSizeScaleMode extends BaseScaleMode
 		FlxG.width = Width;
 		FlxG.height = Height;
 		
-		FlxG.game.scaleX = FlxG.game.scaleY = 1;
+		scale.set(1, 1);
 		FlxG.game.x = FlxG.game.y = 0;
 		
 		if (FlxG.camera != null)
@@ -21,8 +21,8 @@ class StageSizeScaleMode extends BaseScaleMode
 			var newH = Math.ceil(Height / FlxG.camera.zoom);
 			
 			FlxG.camera.setSize(newW, newH);
-			FlxG.camera.flashSprite.x += (newW - oldW) / 2;
-			FlxG.camera.flashSprite.y += (newH - oldH) / 2;
+			FlxG.camera.display.x += (newW - oldW) / 2;
+			FlxG.camera.display.y += (newH - oldH) / 2;
 		}
 	}
 }

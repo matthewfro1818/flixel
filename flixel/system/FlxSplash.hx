@@ -1,11 +1,11 @@
 package flixel.system;
 
-import openfl.display.Graphics;
-import openfl.display.Sprite;
-import openfl.Lib;
-import openfl.text.TextField;
-import openfl.text.TextFormat;
-import openfl.text.TextFormatAlign;
+import flash.display.Graphics;
+import flash.display.Sprite;
+import flash.Lib;
+import flash.text.TextField;
+import flash.text.TextFormat;
+import flash.text.TextFormatAlign;
 import flixel.FlxG;
 import flixel.FlxState;
 import flixel.tweens.FlxEase;
@@ -41,7 +41,7 @@ class FlxSplash extends FlxState
 		_cachedAutoPause = FlxG.autoPause;
 		FlxG.autoPause = false;
 		
-		#if !FLX_NO_KEYBOARD
+		#if FLX_KEYBOARD
 		FlxG.keys.enabled = false;
 		#end
 		
@@ -51,7 +51,7 @@ class FlxSplash extends FlxState
 		
 		for (time in _times)
 		{
-			new FlxTimer(time, timerCallback);
+			new FlxTimer().start(time, timerCallback);
 		}
 		
 		var stageWidth:Int = Lib.current.stage.stageWidth;
@@ -72,8 +72,8 @@ class FlxSplash extends FlxState
 		
 		onResize(stageWidth, stageHeight);
 		
-		#if !FLX_NO_SOUND_SYSTEM 
-		FlxG.sound.load(FlxAssets.getSound("assets/sounds/flixel")).play();
+		#if FLX_SOUND_SYSTEM 
+		FlxG.sound.load(FlxAssets.getSound("flixel/sounds/flixel")).play();
 		#end
 	}
 	
@@ -108,12 +108,12 @@ class FlxSplash extends FlxState
 		_functions[_curPart]();
 		_text.textColor = _colors[_curPart];
 		_text.text = "HaxeFlixel";
-		_curPart ++;
+		_curPart++;
 		
 		if (_curPart == 5)
 		{
 			// Make the logo a tad bit longer, so our users fully appreciate our hard work :D
-			FlxTween.tween(_sprite, { alpha: 0 }, 3.0, { ease: FlxEase.quadOut, complete: onComplete } );
+			FlxTween.tween(_sprite, { alpha: 0 }, 3.0, { ease: FlxEase.quadOut, onComplete: onComplete } );
 			FlxTween.tween(_text, { alpha: 0 }, 3.0, { ease: FlxEase.quadOut } );
 		}
 	}
@@ -186,7 +186,7 @@ class FlxSplash extends FlxState
 		FlxG.cameras.bgColor = _cachedBgColor;
 		FlxG.fixedTimestep = _cachedTimestep;
 		FlxG.autoPause = _cachedAutoPause;
-		#if !FLX_NO_KEYBOARD
+		#if FLX_KEYBOARD
 		FlxG.keys.enabled = true;
 		#end
 		FlxG.stage.removeChild(_sprite);

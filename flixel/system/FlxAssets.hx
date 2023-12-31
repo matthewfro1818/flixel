@@ -1,42 +1,56 @@
 package flixel.system;
 
-#if macro
-import haxe.macro.Context;
-import haxe.macro.Expr;
-import sys.FileSystem;
-using StringTools;
-#else
-import openfl.display.BitmapData;
-import openfl.display.Graphics;
-import openfl.media.Sound;
-import openfl.text.Font;
+#if !macro
+import flash.display.BitmapData;
+import flash.display.Graphics;
+import flash.media.Sound;
 import flixel.FlxG;
-import flixel.util.loaders.CachedGraphics;
-import flixel.util.loaders.TexturePackerData;
-import flixel.util.loaders.TextureRegion;
+import flixel.graphics.FlxGraphic;
+import flixel.graphics.frames.FlxAtlasFrames;
+import flixel.graphics.frames.FlxFrame;
+import flixel.graphics.frames.FlxFramesCollection;
+import flixel.util.typeLimit.OneOfFour;
+import flixel.util.typeLimit.OneOfThree;
+import flixel.util.typeLimit.OneOfTwo;
 import openfl.Assets;
+import openfl.utils.ByteArray;
 
-@:font("assets/fonts/nokiafc22.ttf")
-private class FontDefault extends Font {}
-#if !FLX_NO_DEBUG
-@:font("assets/fonts/arial.ttf")
-private class FontDebugger extends Font {}
-#end
-
-@:bitmap("assets/images/logo/logo.png")
+@:keep @:bitmap("assets/images/logo/logo.png")
 class GraphicLogo extends BitmapData {}
+
+@:keep @:bitmap("assets/images/ui/virtual-input.png")
+class GraphicVirtualInput extends BitmapData {}
+
+@:file("assets/images/ui/virtual-input.txt")
+class VirtualInputData extends #if (lime_legacy || nme) ByteArray #else ByteArrayData #end {}
+
+typedef FlxAngelCodeSource = OneOfTwo<Xml, String>;
+typedef FlxTexturePackerSource = OneOfTwo<String, TexturePackerObject>;
+typedef FlxSoundAsset = OneOfThree<String, Sound, Class<Sound>>;
+typedef FlxGraphicAsset = OneOfThree<FlxGraphic, BitmapData, String>;
+typedef FlxGraphicSource = OneOfThree<BitmapData, Class<Dynamic>, String>;
+typedef FlxTilemapGraphicAsset = OneOfFour<FlxFramesCollection, FlxGraphic, BitmapData, String>;
+typedef FlxBitmapFontGraphicAsset = OneOfFour<FlxFrame, FlxGraphic, BitmapData, String>;
+
+typedef FlxShader = #if (openfl_legacy || nme) Dynamic; #else  openfl.display.Shader; #end
+
+typedef AssetType = #if (openfl >= "5.0.0") openfl.utils.AssetType #else  openfl.Assets.AssetType; #end
+
 #end
 
 class FlxAssets
 {
 #if macro
 	/**
-	 * Reads files from a directory relative to this project and generates public static inlined
+	 * Reads files from a directory relative to this project and generates `public static inline`
 	 * variables containing the string paths to the files in it. 
 	 * 
 	 * Example usage:
+	 * 
+	 * ```haxe
 	 * @:build(flixel.system.FlxAssets.buildFileReferences("assets/images"))
 	 * class Images {}
+	 * ```
 	 * 
 	 * Mostly copied from:
 	 * @author Mark Knol
@@ -44,67 +58,16 @@ class FlxAssets
 	 * 
 	 * @param   directory          The directory to scan for files
 	 * @param   subDirectories     Whether to include subdirectories
-	 * @param   filterExtensions   Example: [jpg, png, gif] will only add files with that extension. Null means: all extensions
+	 * @param   filterExtensions   Example: `["jpg", "png", "gif"]` will only add files with that extension.
 	 */
-	macro public static function buildFileReferences(directory:String = "assets/", subDirectories:Bool = false, ?filterExtensions:Array<String>):Array<Field>
+	public static macro function buildFileReferences(directory:String = "assets/", subDirectories:Bool = false, ?filterExtensions:Array<String>):Array<haxe.macro.Expr.Field>
 	{
-		if (!directory.endsWith("/"))
-			directory += "/";
-		
-		var fileReferences:Array<FileReference> = getFileReferences(directory, subDirectories, filterExtensions);
-		
-		var fields:Array<Field> = Context.getBuildFields();
-		for (fileRef in fileReferences)
-		{
-			// create new field based on file references!
-			fields.push({
-				name: fileRef.name,
-				doc: fileRef.documentation,
-				access: [Access.APublic, Access.AStatic, Access.AInline],
-				kind: FieldType.FVar(macro:String, macro $v{fileRef.value}),
-				pos: Context.currentPos()
-			});
-		}
-		return fields;
-	}
-	
-	private static function getFileReferences(directory:String, subDirectories:Bool = false, ?filterExtensions:Array<String>):Array<FileReference>
-	{
-		var fileReferences:Array<FileReference> = [];
-		var directoryInfo = FileSystem.readDirectory(directory);
-		for (name in directoryInfo)
-		{
-			if (!FileSystem.isDirectory(directory + name))
-			{
-				if (filterExtensions != null)
-				{
-					var extension:String = name.split(".")[1]; // get the string after the dot
-					if (filterExtensions.indexOf(extension) == -1)
-						break;
-				}
-				
-				fileReferences.push(new FileReference(directory + name));
-			}
-			else if (subDirectories)
-			{
-				fileReferences = fileReferences.concat(getFileReferences(directory + name + "/", true, filterExtensions));
-			}
-		}
-		return fileReferences;
+		return flixel.system.macros.FlxAssetPaths.buildFileReferences(directory, subDirectories, filterExtensions);
 	}
 #else
 	// fonts
 	public static var FONT_DEFAULT:String = "Nokia Cellphone FC Small";
-	public static var FONT_DEBUGGER:String = "Arial";
-	
-	public static function init():Void
-	{
-		Font.registerFont(FontDefault);
-		
-		#if !FLX_NO_DEBUG
-		Font.registerFont(FontDebugger);
-		#end
-	}
+	public static var FONT_DEBUGGER:String = "Monsterrat";
 	
 	public static function drawLogo(graph:Graphics):Void
 	{
@@ -164,7 +127,83 @@ class FlxAssets
 	
 	public static inline function getBitmapData(id:String):BitmapData
 	{
-		return Assets.getBitmapData(id, false);
+		if (Assets.exists(id))
+			return Assets.getBitmapData(id, false);
+		FlxG.log.error('Could not find a BitmapData asset with ID \'$id\'.');
+		return null;
+	}
+	
+	/**
+	 * Generates BitmapData from specified class. Less typing.
+	 * 
+	 * @param	source	BitmapData class to generate BitmapData object from.
+	 * @return	Newly instantiated BitmapData object.
+	 */
+	public static inline function getBitmapFromClass(source:Class<Dynamic>):BitmapData
+	{
+		return Type.createInstance(source, [0, 0]);
+	}
+	
+	/**
+	 * Takes Dynamic object as a input and tries to convert it to BitmapData:
+	 * 1) if the input is BitmapData, then it will return this BitmapData;
+	 * 2) if the input is Class<BitmapData>, then it will create BitmapData from this class;
+	 * 3) if the input is String, then it will get BitmapData from openfl.Assets;
+	 * 4) it will return null in any other case.
+	 * 
+	 * @param	Graphic	input data to get BitmapData object for.
+	 * @return	BitmapData for specified Dynamic object.
+	 */
+	public static function resolveBitmapData(Graphic:FlxGraphicSource):BitmapData
+	{
+		if (Std.is(Graphic, BitmapData))
+		{
+			return cast Graphic;
+		}
+		else if (Std.is(Graphic, Class))
+		{
+			return FlxAssets.getBitmapFromClass(cast Graphic);
+		}
+		else if (Std.is(Graphic, String))
+		{
+			return FlxAssets.getBitmapData(Graphic);
+		}
+		
+		return null;
+	}
+	
+	/**
+	 * Takes Dynamic object as a input and tries to find appropriate key String for its BitmapData:
+	 * 1) if the input is BitmapData, then it will return second (optional) argument (the Key);
+	 * 2) if the input is Class<BitmapData>, then it will return the name of this class;
+	 * 3) if the input is String, then it will return it;
+	 * 4) it will return null in any other case.
+	 * 
+	 * @param	Graphic	input data to get string key for.
+	 * @param	Key	optional key string.
+	 * @return	Key String for specified Graphic object.
+	 */
+	public static function resolveKey(Graphic:FlxGraphicSource, ?Key:String):String
+	{
+		if (Key != null)
+		{
+			return Key;
+		}
+		
+		if (Std.is(Graphic, BitmapData))
+		{
+			return Key;
+		}
+		else if (Std.is(Graphic, Class))
+		{
+			return FlxG.bitmap.getKeyForClass(cast Graphic);
+		}
+		else if (Std.is(Graphic, String))
+		{
+			return Graphic;
+		}
+		
+		return null;
 	}
 	
 	public static inline function getSound(id:String):Sound
@@ -177,37 +216,11 @@ class FlxAssets
 		#end
 		return Assets.getSound(id + extension);
 	}
-#end
-}
-
-#if macro
-private class FileReference
-{
-	public var name:String;
-	public var value:String;
-	public var documentation:String;
 	
-	public function new(value:String)
+	public static function getVirtualInputFrames():FlxAtlasFrames
 	{
-		this.value = value;
-		
-		// replace some forbidden names to underscores, since variables cannot have these symbols.
-		this.name = value.split("-").join("_").split(".").join("__");
-		var split:Array<String> = name.split("/");
-		this.name = split[split.length - 1];
-		
-		// auto generate documentation
-		this.documentation = "\"" + value + "\" (auto generated).";
+		var graphic:FlxGraphic = FlxGraphic.fromClass(GraphicVirtualInput);
+		return FlxAtlasFrames.fromSpriteSheetPacker(graphic, Std.string(new VirtualInputData()));
 	}
-}
-#else
-typedef FlxSoundAsset = OneOfThree<String, Sound, Class<Sound>>;
-// Class<Dynamic> should actually be Class<BitmapData>, but needs to be the former so we can use Std.is() on it
-typedef FlxGraphicAsset = OneOfFive<String, Class<Dynamic>, CachedGraphics, TextureRegion, BitmapData>;
-typedef FlxTextureAsset = OneOfTwo<TexturePackerData, CachedGraphics>;
-typedef FlxTilemapAsset = OneOfTwo<String, Array<Int>>;
-
-private abstract OneOfTwo<T1, T2>(Dynamic) from T1 from T2 to T1 to T2 { }
-private abstract OneOfThree<T1, T2, T3>(Dynamic) from T1 from T2 from T3 to T1 to T2 to T3 {}
-private abstract OneOfFive<T1, T2, T3, T4, T5>(Dynamic) from T1 from T2 from T3 from T4 from T5 to T1 to T2 to T3 to T4 to T5 { }
 #end
+}
