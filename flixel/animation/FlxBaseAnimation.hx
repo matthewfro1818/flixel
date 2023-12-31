@@ -1,6 +1,5 @@
 package flixel.animation;
 
-import flixel.FlxSprite;
 import flixel.util.FlxDestroyUtil.IFlxDestroyable;
 
 /**
@@ -15,13 +14,12 @@ class FlxBaseAnimation implements IFlxDestroyable
 	public var parent:FlxAnimationController;
 	
 	/**
-	 * String name of the animation (e.g. "walk")
+	 * String name of the animation (e.g. `"walk"`)
 	 */
 	public var name:String;
 	
 	/**
 	 * Keeps track of the current index into the tile sheet based on animation or rotation.
-	 * Allow access to private var from FlxAnimationController.
 	 */
 	public var curIndex(default, set):Int = 0;
 	
@@ -49,7 +47,7 @@ class FlxBaseAnimation implements IFlxDestroyable
 		name = null;
 	}
 	
-	public function update():Void {}
+	public function update(elapsed:Float):Void {}
 	
 	public function clone(Parent:FlxAnimationController):FlxBaseAnimation
 	{

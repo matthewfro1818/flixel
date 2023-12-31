@@ -1,6 +1,4 @@
 package flixel.animation;
-import flixel.animation.FlxBaseAnimation;
-import flixel.FlxSprite;
 
 /**
  * ...
