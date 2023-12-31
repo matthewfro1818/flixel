@@ -1,297 +1,194 @@
 package flixel.animation;
-
 import flixel.FlxG;
+import flixel.FlxSprite;
+import flixel.math.FlxRandom;
 
 /**
- * Just a helper structure for the `FlxSprite` animation system.
+ * Just a helper structure for the FlxSprite animation system.
  */
 class FlxAnimation extends FlxBaseAnimation
 {
 	/**
 	 * Animation frameRate - the speed in frames per second that the animation should play at.
 	 */
-	public var frameRate(default, set):Float;
-
+	public var frameRate(default, set):Int;
+	
 	/**
 	 * Keeps track of the current frame of animation.
 	 * This is NOT an index into the tile sheet, but the frame number in the animation object.
 	 */
 	public var curFrame(default, set):Int = 0;
-
+	
 	/**
-	 * Accessor for `frames.length`
+	 * Accesor for frames.length
 	 */
-	public var numFrames(get, never):Int;
-
+	public var numFrames(get, null):Int;
+	
 	/**
-	 * Seconds between frames (inverse of the framerate)
-	 * 
-	 * Note: `FlxFrameCollections` and `FlxAtlasFrames` may have their own duration set per-frame,
-	 * those values will override this value.
+	 * Seconds between frames (basically the framerate)
 	 */
-	public var frameDuration:Float = 0;
-
-	/**
-	 * Seconds between frames (inverse of the framerate)
-	 */
-	@:deprecated('FlxAnimation.delay is deprecated, use `frameDuration`')
-	public var delay(get, set):Float;
-
+	public var delay(default, null):Float = 0;
+	
 	/**
 	 * Whether the current animation has finished.
 	 */
-	public var finished(default, null):Bool = true;
-
+	public var finished:Bool = true;
+	
 	/**
 	 * Whether the current animation gets updated or not.
 	 */
 	public var paused:Bool = true;
-
-	/**
-	 * Whether or not the animation is looped.
-	 */
-	public var looped:Bool = true;
-
-	/**
-	 * The custom loop point for this animation.
-	 * This allows you to skip the first few frames of an animation when looping.
-	 */
-	public var loopPoint:Int = 0;
-
-	/**
-	 * Whether or not this animation is being played backwards.
-	 */
-	public var reversed(default, null):Bool = false;
-
-	/**
-	 * Whether or not the frames of this animation are horizontally flipped
-	 */
-	public var flipX:Bool = false;
-
-	/**
-	 * Whether or not the frames of this animation are vertically flipped
-	 */
-	public var flipY:Bool = false;
-
-	/**
-	 * A list of frames stored as int indices
-	 * @since 4.2.0
-	 */
-	public var frames:Array<Int>;
 	
 	/**
-	 * How fast or slow time should pass for this animation.
-	 * 
-	 * Similar to `FlxAnimationController`'s `timeScale`, but won't effect other animations.
-	 * @since 5.4.1
+	 * Whether or not the animation is looped
 	 */
-	public var timeScale:Float = 1.0;
-
+	public var looped:Bool = true;
+	
+	
+	/**
+	 * A list of frames stored as int objects
+	 */
+	@:allow(flixel.animation)
+	private var _frames:Array<Int>;
+	
 	/**
 	 * Internal, used to time each frame of animation.
 	 */
-	var _frameTimer:Float = 0;
-
+	private var _frameTimer:Float = 0;
+	
 	/**
-	 * @param   name        What this animation should be called (e.g. `"run"`).
-	 * @param   frames      An array of numbers indicating what frames to play in what order (e.g. `[1, 2, 3]`).
-	 * @param   frameRate   The speed in frames per second that the animation should play at (e.g. `40`).
-	 * @param   looped      Whether or not the animation is looped or just plays once.
-	 * @param   flipX       Whether or not the frames of this animation are horizontally flipped.
-	 * @param   flipY       Whether or not the frames of this animation are vertically flipped.
+	 * @param	Name		What this animation should be called (e.g. "run")
+	 * @param	Frames		An array of numbers indicating what frames to play in what order (e.g. 1, 2, 3)
+	 * @param	FrameRate	The speed in frames per second that the animation should play at (e.g. 40)
+	 * @param	Looped		Whether or not the animation is looped or just plays once
 	 */
-	public function new(parent:FlxAnimationController, name:String, frames:Array<Int>, frameRate = 0.0, looped = true, flipX = false, flipY = false)
+	public function new(Parent:FlxAnimationController, Name:String, Frames:Array<Int>, FrameRate:Int = 0, Looped:Bool = true)
 	{
-		super(parent, name);
-
-		this.frameRate = frameRate;
-		this.frames = frames;
-		this.looped = looped;
-		this.flipX = flipX;
-		this.flipY = flipY;
+		super(Parent, Name);
+		
+		frameRate = FrameRate;
+		_frames = Frames;
+		looped = Looped;
 	}
-
+	
 	/**
 	 * Clean up memory.
 	 */
 	override public function destroy():Void
 	{
-		frames = null;
+		_frames = null;
 		name = null;
 		super.destroy();
 	}
-
-	/**
-	 * Starts this animation playback.
-	 *
-	 * @param   Force      Whether to force this animation to restart.
-	 * @param   Reversed   Whether to play animation backwards or not.
-	 * @param   Frame      The frame number in this animation you want to start from (`0` by default).
-	 *                     If you pass a negative value then it will start from a random frame.
-	 *                     If you `Reversed` is `true`, the frame value will be "reversed"
-	 *                     (`Frame = numFrames - 1 - Frame`), so `Frame` value will mean frame index
-	 *                     from the animation's end in this case.
-	 */
-	public function play(Force:Bool = false, Reversed:Bool = false, Frame:Int = 0):Void
+	
+	public function play(Force:Bool = false, Frame:Int = 0):Void
 	{
-		if (!Force && !finished && reversed == Reversed)
+		if (!Force && (looped || !finished))
 		{
 			paused = false;
+			finished = false;
+			set_curFrame(curFrame);
 			return;
 		}
-
-		reversed = Reversed;
+		
 		paused = false;
 		_frameTimer = 0;
-		finished = frameDuration == 0;
-
-		var maxFrameIndex:Int = numFrames - 1;
-		if (Frame < 0)
-			curFrame = FlxG.random.int(0, maxFrameIndex);
+		
+		if ((delay <= 0) || (Frame == (numFrames - 1)))
+		{
+			finished = true;
+		}
 		else
 		{
-			if (Frame > maxFrameIndex)
-				Frame = maxFrameIndex;
-			if (reversed)
-				Frame = (maxFrameIndex - Frame);
+			finished = false;
+		}
+		
+		if (Frame < 0)
+		{
+			curFrame = FlxRandom.int(0, numFrames - 1);
+		}
+		else if (numFrames > Frame)
+		{
 			curFrame = Frame;
 		}
-
-		if (finished)
-			parent.fireFinishCallback(name);
+		else
+		{
+			curFrame = 0;
+		}
 	}
-
+	
 	public function restart():Void
 	{
-		play(true, reversed);
+		play(true);
 	}
-
+	
 	public function stop():Void
 	{
 		finished = true;
 		paused = true;
 	}
-
-	public function reset():Void
+	
+	override public function update():Void
 	{
-		stop();
-		curFrame = reversed ? (numFrames - 1) : 0;
-	}
-
-	public function finish():Void
-	{
-		stop();
-		curFrame = reversed ? 0 : (numFrames - 1);
-	}
-
-	public function pause():Void
-	{
-		paused = true;
-	}
-
-	public inline function resume():Void
-	{
-		paused = false;
-	}
-
-	public function reverse():Void
-	{
-		reversed = !reversed;
-		if (finished)
-			play(false, reversed);
-	}
-
-	override public function update(elapsed:Float):Void
-	{
-		var curFrameDuration = getCurrentFrameDuration();
-		if (curFrameDuration == 0 || finished || paused)
-			return;
-
-		_frameTimer += elapsed * timeScale;
-		while (_frameTimer > curFrameDuration && !finished)
+		if (delay > 0 && (looped || !finished) && !paused)
 		{
-			_frameTimer -= curFrameDuration;
-			if (reversed)
+			_frameTimer += FlxG.elapsed;
+			while (_frameTimer > delay)
 			{
-				if (looped && curFrame == loopPoint)
-					curFrame = numFrames - 1;
+				_frameTimer = _frameTimer - delay;
+				if (looped && (curFrame == numFrames - 1))
+				{
+					curFrame = 0;
+				}
 				else
-					curFrame--;
-			}
-			else
-			{
-				if (looped && curFrame == numFrames - 1)
-					curFrame = loopPoint;
-				else
+				{
 					curFrame++;
+				}
 			}
-			
-			// prevents null ref when the sprite is destroyed on finishCallback (#2782)
-			if (finished)
-				break;
-			
-			curFrameDuration = getCurrentFrameDuration();
 		}
 	}
-
-	function getCurrentFrameDuration()
+	
+	override public function clone(Parent:FlxAnimationController):FlxAnimation
 	{
-		final curframeDuration = parent.getFrameDuration(frames[curFrame]);
-		return curframeDuration > 0 ? curframeDuration : frameDuration;
+		return new FlxAnimation(Parent, name, _frames, frameRate, looped);
 	}
-
-	override public function clone(newParent:FlxAnimationController):FlxAnimation
+	
+	private function set_frameRate(value:Int):Int
 	{
-		return new FlxAnimation(newParent, name, frames, frameRate, looped, flipX, flipY);
-	}
-
-	function set_frameRate(value:Float):Float
-	{
+		delay = 0;
 		frameRate = value;
-		frameDuration = (value > 0 ? 1.0 / value : 0);
+		if (value > 0)
+		{
+			delay = 1.0 / value;
+		}
 		return value;
 	}
-
-	function set_curFrame(frame:Int):Int
+	
+	private function set_curFrame(Frame:Int):Int
 	{
-		var maxFrameIndex:Int = numFrames - 1;
-		var tempFrame:Int = (reversed) ? (maxFrameIndex - frame) : frame;
-
-		if (tempFrame >= 0)
+		if (Frame >= 0)
 		{
-			if (!looped && tempFrame > maxFrameIndex)
+			if (!looped && Frame >= numFrames)
 			{
 				finished = true;
-				curFrame = reversed ? 0 : maxFrameIndex;
+				curFrame = numFrames - 1;
 			}
 			else
 			{
-				curFrame = frame;
+				curFrame = Frame;
 			}
 		}
 		else
-			curFrame = FlxG.random.int(0, maxFrameIndex);
-
-		curIndex = frames[curFrame];
-
-		if (finished && parent != null)
-			parent.fireFinishCallback(name);
-
-		return frame;
+		{
+			curFrame = FlxRandom.int(0, numFrames - 1);
+		}
+		
+		curIndex = _frames[curFrame];
+		return Frame;
 	}
-
-	inline function get_numFrames():Int
+	
+	private inline function get_numFrames():Int
 	{
-		return frames.length;
-	}
-
-	inline function get_delay()
-	{
-		return frameDuration;
-	}
-
-	inline function set_delay(value:Float)
-	{
-		return frameDuration = value;
+		return _frames.length;
 	}
 }
