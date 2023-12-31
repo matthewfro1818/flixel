@@ -1,20 +1,17 @@
 package flixel.math;
 
-import flixel.FlxG;
-import openfl.geom.Point;
+import flash.geom.Point;
 import flixel.util.FlxPool;
 import flixel.util.FlxPool.IFlxPooled;
 import flixel.util.FlxStringUtil;
+import openfl.geom.Matrix;
 
 /**
  * Stores a 2D floating point coordinate.
  */
 class FlxPoint implements IFlxPooled
 {
-	/**
-	 * Used to account for floating-point inaccuracies in the equals() function.
-	 */
-	public static inline var EPSILON:Float = 0.0000001;
+	public static var pool(get, never):IFlxPool<FlxPoint>;
 	
 	private static var _pool = new FlxPool<FlxPoint>(FlxPoint);
 	
@@ -43,7 +40,7 @@ class FlxPoint implements IFlxPooled
 	 */
 	public static inline function weak(X:Float = 0, Y:Float = 0):FlxPoint
 	{
-		var point = _pool.get().set(X, Y);
+		var point = get(X, Y);
 		point._weak = true;
 		return point;
 	}
@@ -54,6 +51,7 @@ class FlxPoint implements IFlxPooled
 	private var _weak:Bool = false;
 	private var _inPool:Bool = false;
 	
+	@:keep
 	public function new(X:Float = 0, Y:Float = 0) 
 	{
 		set(X, Y);
@@ -67,6 +65,7 @@ class FlxPoint implements IFlxPooled
 		if (!_inPool)
 		{
 			_inPool = true;
+			_weak = false;
 			_pool.putUnsafe(this);
 		}
 	}
@@ -78,7 +77,7 @@ class FlxPoint implements IFlxPooled
 	{
 		if (_weak)
 		{
-			_pool.put(this);
+			put();
 		}
 	}
 	
@@ -97,7 +96,7 @@ class FlxPoint implements IFlxPooled
 	}
 	
 	/**
-	 * Adds the to the coordinates of this point.
+	 * Adds to the coordinates of this point.
 	 * 
 	 * @param	X	Amount to add to x
 	 * @param	Y	Amount to add to y
@@ -125,7 +124,7 @@ class FlxPoint implements IFlxPooled
 	}
 	
 	/**
-	 * Adds the to the coordinates of this point.
+	 * Subtracts from the coordinates of this point.
 	 * 
 	 * @param	X	Amount to subtract from x
 	 * @param	Y	Amount to subtract from y
@@ -139,7 +138,7 @@ class FlxPoint implements IFlxPooled
 	}
 	
 	/**
-	 * Adds the coordinates of another point to the coordinates of this point.
+	 * Subtracts the coordinates of another point from the coordinates of this point.
 	 * 
 	 * @param	point	The point to subtract from this point
 	 * @return	This point.
@@ -153,6 +152,20 @@ class FlxPoint implements IFlxPooled
 	}
 	
 	/**
+	 * Scale this point.
+	 * 
+	 * @param	k - scale coefficient
+	 * @return	scaled point
+	 * @since   4.1.0
+	 */
+	public function scale(k:Float):FlxPoint
+	{
+		x *= k;
+		y *= k;
+		return this;
+	}
+	
+	/**
 	 * Helper function, just copies the values from the specified point.
 	 * 
 	 * @param	point	Any FlxPoint.
@@ -162,6 +175,7 @@ class FlxPoint implements IFlxPooled
 	{
 		x = point.x;
 		y = point.y;
+		point.putWeak();
 		return this;
 	}
 	
@@ -203,8 +217,41 @@ class FlxPoint implements IFlxPooled
 	 */
 	public inline function copyToFlash(FlashPoint:Point):Point
 	{
+		if (FlashPoint == null)
+		{
+			FlashPoint = new Point();
+		}
+		
 		FlashPoint.x = x;
 		FlashPoint.y = y;
+		return FlashPoint;
+	}
+
+	/**
+	 * Helper function, just increases the values of the specified Flash point by the values of this point.
+	 * 
+	 * @param	Point	Any Point.
+	 * @return	A reference to the altered point parameter.
+	 */
+	public inline function addToFlash(FlashPoint:Point):Point
+	{
+		FlashPoint.x += x;
+		FlashPoint.y += y;
+
+		return FlashPoint;
+	}
+
+	/**
+	 * Helper function, just decreases the values of the specified Flash point by the values of this point.
+	 * 
+	 * @param	Point	Any Point.
+	 * @return	A reference to the altered point parameter.
+	 */
+	public inline function subtractFromFlash(FlashPoint:Point):Point
+	{
+		FlashPoint.x -= x;
+		FlashPoint.y -= y;
+
 		return FlashPoint;
 	}
 	
@@ -228,7 +275,7 @@ class FlxPoint implements IFlxPooled
 	 * @param	Rect	The FlxRect to test within
 	 * @return	True if pointX/pointY is within the FlxRect, otherwise false
 	 */
-	public inline function inFlxRect(Rect:FlxRect):Bool
+	public inline function inRect(Rect:FlxRect):Bool
 	{
 		return FlxMath.pointInFlxRect(x, y, Rect);
 	}
@@ -239,9 +286,12 @@ class FlxPoint implements IFlxPooled
 	 * @param 	AnotherPoint	A FlxPoint object to calculate the distance to.
 	 * @return	The distance between the two points as a Float.
 	 */
-	public inline function distanceTo(AnotherPoint:FlxPoint):Float
+	public function distanceTo(point:FlxPoint):Float
 	{
-		return FlxMath.getDistance(this, AnotherPoint);
+		var dx:Float = x - point.x;
+		var dy:Float = y - point.y;
+		point.putWeak();
+		return FlxMath.vectorLength(dx, dy);
 	}
 	
 	/**
@@ -265,6 +315,16 @@ class FlxPoint implements IFlxPooled
 	}
 	
 	/**
+	 * Rounds x and y using Math.round()
+	 */
+	public inline function round():FlxPoint
+	{
+		x = Math.round(x);
+		y = Math.round(y);
+		return this;
+	}
+	
+	/**
 	 * Rotates this point clockwise in 2D space around another point by the given angle.
 	 * 
 	 * @param   Pivot   The pivot you want to rotate this point around
@@ -273,72 +333,9 @@ class FlxPoint implements IFlxPooled
 	 */
 	public function rotate(Pivot:FlxPoint, Angle:Float):FlxPoint
 	{
-		var sin:Float = 0;
-		var cos:Float = 0;
 		var radians:Float = Angle * FlxAngle.TO_RAD;
-		while (radians < -Math.PI)
-		{
-			radians += Math.PI * 2;
-		}
-		while (radians > Math.PI)
-		{
-			radians = radians - Math.PI * 2;
-		}
-		
-		if (radians < 0)
-		{
-			sin = 1.27323954 * radians + .405284735 * radians * radians;
-			if (sin < 0)
-			{
-				sin = .225 * (sin *-sin - sin) + sin;
-			}
-			else
-			{
-				sin = .225 * (sin * sin - sin) + sin;
-			}
-		}
-		else
-		{
-			sin = 1.27323954 * radians - 0.405284735 * radians * radians;
-			if (sin < 0)
-			{
-				sin = .225 * (sin *-sin - sin) + sin;
-			}
-			else
-			{
-				sin = .225 * (sin * sin - sin) + sin;
-			}
-		}
-		
-		radians += Math.PI / 2;
-		if (radians > Math.PI)
-		{
-			radians = radians - Math.PI * 2;
-		}
-		if (radians < 0)
-		{
-			cos = 1.27323954 * radians + 0.405284735 * radians * radians;
-			if (cos < 0)
-			{
-				cos = .225 * (cos *-cos - cos) + cos;
-			}
-			else
-			{
-				cos = .225 * (cos * cos - cos) + cos;
-			}
-		}
-		else
-		{
-			cos = 1.27323954 * radians - 0.405284735 * radians * radians;
-			if (cos < 0)
-			{
-				cos = .225 * (cos *-cos - cos) + cos;
-			}
-			else
-			{
-				cos = .225 * (cos * cos - cos) + cos;
-			}
-		}
+		var sin:Float = FlxMath.fastSin(radians);
+		var cos:Float = FlxMath.fastCos(radians);
 		
 		var dx:Float = x - Pivot.x;
 		var dy:Float = y - Pivot.y;
@@ -375,7 +372,7 @@ class FlxPoint implements IFlxPooled
 			{
 				angle = c2 - c1 * ((x + ay) / (ay - x));
 			}
-			angle = ((y < 0) ? - angle : angle) * FlxAngle.TO_DEG;
+			angle = ((y < 0) ? -angle : angle) * FlxAngle.TO_DEG;
 			
 			if (angle > 90)
 			{
@@ -394,18 +391,33 @@ class FlxPoint implements IFlxPooled
 	/**
 	 * Function to compare this FlxPoint to another.
 	 * 
-	 * @param	OtherFlxPoint  The other FlxPoint to compare to this one.
+	 * @param	point  The other FlxPoint to compare to this one.
 	 * @return	True if the FlxPoints have the same x and y value, false otherwise.
 	 */
-	public inline function equals(OtherFlxPoint:FlxPoint):Bool
+	public inline function equals(point:FlxPoint):Bool
 	{
-		return Math.abs(x - OtherFlxPoint.x) < EPSILON && Math.abs(y - OtherFlxPoint.y) < EPSILON;
+		var result = FlxMath.equal(x, point.x) && FlxMath.equal(y, point.y);
+		point.putWeak();
+		return result;
 	}
 	
 	/**
 	 * Necessary for IFlxDestroyable.
 	 */
 	public function destroy() {}
+	
+	/**
+	 * Applies transformation matrix to this point
+	 * @param	matrix	transformation matrix
+	 * @return	transformed point
+	 */
+	public inline function transform(matrix:Matrix):FlxPoint
+	{
+		var x1:Float = x * matrix.a + y * matrix.c + matrix.tx;
+		var y1:Float = x * matrix.b + y * matrix.d + matrix.ty;
+		
+		return set(x1, y1);
+	}
 	
 	/**
 	 * Convert object to readable string name. Useful for debugging, save games, etc.
@@ -418,7 +430,7 @@ class FlxPoint implements IFlxPooled
 	}
 	
 	/**
-	 * Necessary for FlxPointHelper in FlxSpriteGroup.
+	 * Necessary for FlxCallbackPoint.
 	 */
 	private function set_x(Value:Float):Float 
 	{ 
@@ -426,11 +438,16 @@ class FlxPoint implements IFlxPooled
 	}
 	
 	/**
-	 * Necessary for FlxPointHelper in FlxSpriteGroup.
+	 * Necessary for FlxCallbackPoint.
 	 */
 	private function set_y(Value:Float):Float
 	{
 		return y = Value; 
+	}
+	
+	private static function get_pool():IFlxPool<FlxPoint>
+	{
+		return _pool;
 	}
 }
 
@@ -445,7 +462,7 @@ class FlxCallbackPoint extends FlxPoint
 	private var _setXYCallback:FlxPoint->Void;
 	
 	/**
-	 * If you only specifiy one callback function, then the remaining two will use the same.
+	 * If you only specify one callback function, then the remaining two will use the same.
 	 * 
 	 * @param	setXCallback	Callback for set_x()
 	 * @param	setYCallback	Callback for set_y()

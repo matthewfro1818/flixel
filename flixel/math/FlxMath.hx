@@ -1,9 +1,9 @@
 package flixel.math;
 
-import openfl.geom.Rectangle;
+import flash.geom.Rectangle;
 import flixel.FlxG;
 import flixel.FlxSprite;
-#if !FLX_NO_TOUCH
+#if FLX_TOUCH
 import flixel.input.touch.FlxTouch;
 #end
 
@@ -12,7 +12,7 @@ import flixel.input.touch.FlxTouch;
  */
 class FlxMath
 {	
-	#if (flash || js || ios)
+	#if (flash || js || ios || blackberry)
 	/**
 	 * Minimum value of a floating point number.
 	 */
@@ -36,16 +36,23 @@ class FlxMath
 	 */
 	public static inline var MAX_VALUE_INT:Int = 0x7FFFFFFF;
 	/**
-	 * Approximation of Math.sqrt(2).
+	 * Approximation of `Math.sqrt(2)`.
 	 */
 	public static inline var SQUARE_ROOT_OF_TWO:Float = 1.41421356237;
+	/**
+	 * Used to account for floating-point inaccuracies.
+	 */
+	public static inline var EPSILON:Float = 0.0000001;
 	
 	/**
 	 * Round a decimal number to have reduced precision (less decimal numbers).
-	 * Ex: roundDecimal(1.2485, 2) -> 1.25
+	 * 
+	 * ```haxe
+	 * roundDecimal(1.2485, 2) = 1.25
+	 * ```
 	 * 
 	 * @param	Value		Any number.
-	 * @param	Precision	Number of decimal points to leave in float. Should be a positive number
+	 * @param	Precision	Number of decimals the result should have.
 	 * @return	The rounded value of that number.
 	 */
 	public static function roundDecimal(Value:Float, Precision:Int):Float
@@ -61,30 +68,35 @@ class FlxMath
 	/**
 	 * Bound a number by a minimum and maximum. Ensures that this number is 
 	 * no smaller than the minimum, and no larger than the maximum.
-	 * Leaving a bound null means that side is unbounded.
+	 * Leaving a bound `null` means that side is unbounded.
 	 * 
 	 * @param	Value	Any number.
 	 * @param	Min		Any number.
 	 * @param	Max		Any number.
 	 * @return	The bounded value of the number.
 	 */
-	public static inline function bound(Value:Float, Min:Null<Float>, Max:Null<Float>):Float
+	public static inline function bound(Value:Float, ?Min:Float, ?Max:Float):Float
 	{
 		var lowerBound:Float = (Min != null && Value < Min) ? Min : Value;
 		return (Max != null && lowerBound > Max) ? Max : lowerBound;
 	}
 	
 	/**
-	 * Returns linear interpolated value between Max and Min numbers
-	 *
-	 * @param Min 		Lower bound.
-	 * @param Max	 	Higher bound.
-	 * @param Ratio 	Defines which number is closer to desired value.
-	 * @return 			Interpolated number.
+	 * Returns the linear interpolation of two numbers if `ratio`
+	 * is between 0 and 1, and the linear extrapolation otherwise.
+	 * 
+	 * Examples:
+	 * 
+	 * ```haxe
+	 * lerp(a, b, 0) = a
+	 * lerp(a, b, 1) = b
+	 * lerp(5, 15, 0.5) = 10
+	 * lerp(5, 15, -1) = -5
+	 * ```
 	 */
-	public static inline function lerp(Min:Float, Max:Float, Ratio:Float):Float
+	public static inline function lerp(a:Float, b:Float, ratio:Float):Float
 	{
-		return Min + Ratio * (Max - Min);
+		return a + ratio * (b - a);
 	}
 	
 	/**
@@ -97,59 +109,35 @@ class FlxMath
 	 */
 	public static inline function inBounds(Value:Float, Min:Null<Float>, Max:Null<Float>):Bool
 	{
-		return ((Min == null || Value >= Min) && (Max == null || Value <= Max));
+		return (Min == null || Value >= Min) && (Max == null || Value <= Max);
 	}
 	
 	/**
-	 * Returns true if the number given is odd.
-	 * 
-	 * @param	n	The number to check 
-	 * @return	True if the given number is odd. False if the given number is even.
+	 * Returns `true` if the given number is odd.
 	 */
-	public static function isOdd(n:Float):Bool
+	public static inline function isOdd(n:Float):Bool
 	{
-		if ((Std.int(n) & 1) != 0)
-		{
-			return true;
-		}
-		else
-		{
-			return false;
-		}
+		return (Std.int(n) & 1) != 0;
 	}
 	
 	/**
-	 * Returns true if the number given is even.
-	 * 
-	 * @param	n	The number to check
-	 * @return	True if the given number is even. False if the given number is odd.
+	 * Returns `true` if the given number is even.
 	 */
-	public static function isEven(n:Float):Bool
+	public static inline function isEven(n:Float):Bool
 	{
-		if ((Std.int(n) & 1) != 0)
-		{
-			return false;
-		}
-		else
-		{
-			return true;
-		}
+		return (Std.int(n) & 1) == 0;
 	}
 	
 	/**
-	 * Compare two numbers.
-	 * 
-	 * @param	num1	The first number
-	 * @param	num2	The second number
-	 * @return	-1 if num1 is smaller, 1 if num2 is bigger, 0 if they are equal
+	 * Returns `-1` if `a` is smaller, `1` if `b` is bigger and `0` if both numbers are equal.
 	 */
-	public static function numericComparison(num1:Float, num2:Float):Int
+	public static function numericComparison(a:Float, b:Float):Int
 	{
-		if (num2 > num1)
+		if (b > a)
 		{
 			return -1;
 		}
-		else if (num1 > num2)
+		else if (a > b)
 		{
 			return 1;
 		}
@@ -190,14 +178,10 @@ class FlxMath
 	 */
 	public static function pointInFlxRect(pointX:Float, pointY:Float, rect:FlxRect):Bool
 	{
-		if (pointX >= rect.x && pointX <= rect.right && pointY >= rect.y && pointY <= rect.bottom)
-		{
-			return true;
-		}
-		return false;
+		return pointX >= rect.x && pointX <= rect.right && pointY >= rect.y && pointY <= rect.bottom;
 	}
 	
-	#if !FLX_NO_MOUSE
+	#if FLX_MOUSE
 	/**
 	 * Returns true if the mouse world x/y coordinate are within the given rectangular block
 	 * 
@@ -234,11 +218,7 @@ class FlxMath
 	 */
 	public static function pointInRectangle(pointX:Float, pointY:Float, rect:Rectangle):Bool
 	{
-		if (pointX >= rect.x && pointX <= rect.right && pointY >= rect.y && pointY <= rect.bottom)
-		{
-			return true;
-		}
-		return false;
+		return pointX >= rect.x && pointX <= rect.right && pointY >= rect.y && pointY <= rect.bottom;
 	}
 	
 	/**
@@ -268,28 +248,37 @@ class FlxMath
 	}
 	
 	/**
-	 * Adds value to amount and ensures that the result always stays between 0 and max, by wrapping the value around.
+	 * Makes sure that value always stays between 0 and max,
+	 * by wrapping the value around.
 	 * 
-	 * @param 	value 	The value to add the amount to
-	 * @param 	amount 	The amount to add to the value
+	 * @param 	value 	The value to wrap around
+	 * @param 	min		The minimum the value is allowed to be
 	 * @param 	max 	The maximum the value is allowed to be
 	 * @return The wrapped value
 	 */
-	public static function wrapValue(value:Int, amount:Int, max:Int):Int
+	public static function wrap(value:Int, min:Int, max:Int):Int
 	{
-		var output:Int = value + amount;
-		
-		if (output >= max)
-		{
-			output %= max;
-		}
-		
-		while (output < 0)
-		{
-			output += max;
-		}
-		
-		return output;
+		var range:Int = max - min + 1;
+
+		if (value < min)
+			value += range * Std.int((min - value) / range + 1);
+
+		return min + (value - min) % range;
+	}
+
+	/**
+	 * Remaps a number from one range to another.
+	 * 
+	 * @param 	value	The incoming value to be converted
+	 * @param 	start1 	Lower bound of the value's current range
+	 * @param 	stop1 	Upper bound of the value's current range
+	 * @param 	start2  Lower bound of the value's target range
+	 * @param 	stop2 	Upper bound of the value's target range
+	 * @return The remapped value
+	 */
+	public static function remapToRange(value:Float, start1:Float, stop1:Float, start2:Float, stop2:Float)
+	{
+		return start2 + (value - start1) * ((stop2 - start2) / (stop1 - start1));
 	}
 	
 	/**
@@ -306,36 +295,15 @@ class FlxMath
 	{
 		return ax * bx + ay * by;
 	}
-	
+
 	/**
-	 * Finds the length of the given vector
-	 * 
-	 * @param	dx
-	 * @param	dy
-	 * 
-	 * @return The length
+	 * Returns the length of the given vector.
 	 */
 	public static inline function vectorLength(dx:Float, dy:Float):Float
 	{
 		return Math.sqrt(dx * dx + dy * dy);
 	}
-	
-	/**
-	 * Calculate the distance between two points.
-	 * 
-	 * @param 	Point1		A FlxPoint object referring to the first location.
-	 * @param 	Point2		A FlxPoint object referring to the second location.
-	 * @return	The distance between the two points as a floating point Number object.
-	 */
-	public static inline function getDistance(Point1:FlxPoint, Point2:FlxPoint):Float
-	{
-		var dx:Float = Point1.x - Point2.x;
-		var dy:Float = Point1.y - Point2.y;
-		Point1.putWeak();
-		Point2.putWeak();
-		return vectorLength(dx, dy);
-	}
-	
+
 	/**
 	 * Find the distance (in pixels, rounded) between two FlxSprites, taking their origin into account
 	 * 
@@ -352,12 +320,12 @@ class FlxMath
 	
 	/**
 	 * Check if the distance between two FlxSprites is within a specified number. 
-	 * A faster algoritm than distanceBetween because the Math.sqrt() is avoided.
+	 * A faster algorithm than distanceBetween because the Math.sqrt() is avoided.
 	 *
 	 * @param	SpriteA		The first FlxSprite
 	 * @param	SpriteB		The second FlxSprite
 	 * @param	Distance	The distance to check
-	 * @param	IncludeEqual	If set to true, the function will return true if the calcualted distance is equal to the given Distance
+	 * @param	IncludeEqual	If set to true, the function will return true if the calculated distance is equal to the given Distance
 	 * @return	True if the distance between the sprites is less than the given Distance 
 	 */
 	public static inline function isDistanceWithin(SpriteA:FlxSprite, SpriteB:FlxSprite, Distance:Float, IncludeEqual:Bool = false):Bool
@@ -381,8 +349,8 @@ class FlxMath
 	 */
 	public static inline function distanceToPoint(Sprite:FlxSprite, Target:FlxPoint):Int
 	{
-		var dx:Float = (Sprite.x + Sprite.origin.x) - (Target.x);
-		var dy:Float = (Sprite.y + Sprite.origin.y) - (Target.y);
+		var dx:Float = (Sprite.x + Sprite.origin.x) - Target.x;
+		var dy:Float = (Sprite.y + Sprite.origin.y) - Target.y;
 		Target.putWeak();
 		return Std.int(FlxMath.vectorLength(dx, dy));
 	}
@@ -390,12 +358,12 @@ class FlxMath
 	/**
 	 * Check if the distance from an FlxSprite to the given
 	 * FlxPoint is within a specified number. 
-	 * A faster algoritm than distanceToPoint because the Math.sqrt() is avoided.
+	 * A faster algorithm than distanceToPoint because the Math.sqrt() is avoided.
 	 * 
 	 * @param	Sprite	The FlxSprite
 	 * @param	Target	The FlxPoint
 	 * @param	Distance	The distance to check
-	 * @param	IncludeEqual	If set to true, the function will return true if the calcualted distance is equal to the given Distance
+	 * @param	IncludeEqual	If set to true, the function will return true if the calculated distance is equal to the given Distance
 	 * @return	True if the distance between the sprites is less than the given Distance 
 	 */
 	public static inline function isDistanceToPointWithin(Sprite:FlxSprite, Target:FlxPoint, Distance:Float, IncludeEqual:Bool = false):Bool
@@ -411,7 +379,7 @@ class FlxMath
 			return dx * dx + dy * dy < Distance * Distance;
 	}
 	
-	#if !FLX_NO_MOUSE
+	#if FLX_MOUSE
 	/**
 	 * Find the distance (in pixels, rounded) from the object x/y and the mouse x/y
 	 * 
@@ -427,11 +395,11 @@ class FlxMath
 	
 	/**
 	 * Check if the distance from the object x/y and the mouse x/y is within a specified number. 
-	 * A faster algoritm than distanceToMouse because the Math.sqrt() is avoided.
+	 * A faster algorithm than distanceToMouse because the Math.sqrt() is avoided.
 	 *
 	 * @param	Sprite		The FlxSprite to test against
 	 * @param	Distance	The distance to check
-	 * @param	IncludeEqual	If set to true, the function will return true if the calcualted distance is equal to the given Distance
+	 * @param	IncludeEqual	If set to true, the function will return true if the calculated distance is equal to the given Distance
 	 * @return	True if the distance between the sprites is less than the given Distance 
 	 */
 	public static inline function isDistanceToMouseWithin(Sprite:FlxSprite, Distance:Float, IncludeEqual:Bool = false):Bool
@@ -446,7 +414,7 @@ class FlxMath
 	}
 	#end
 	
-	#if !FLX_NO_TOUCH
+	#if FLX_TOUCH
 	/**
 	 * Find the distance (in pixels, rounded) from the object x/y and the FlxPoint screen x/y
 	 * 
@@ -463,11 +431,11 @@ class FlxMath
 	
 	/**
 	 * Check if the distance from the object x/y and the FlxPoint screen x/y is within a specified number. 
-	 * A faster algoritm than distanceToTouch because the Math.sqrt() is avoided.
+	 * A faster algorithm than distanceToTouch because the Math.sqrt() is avoided.
 	 *
 	 * @param	Sprite	The FlxSprite to test against
 	 * @param	Distance	The distance to check
-	 * @param	IncludeEqual	If set to true, the function will return true if the calcualted distance is equal to the given Distance
+	 * @param	IncludeEqual	If set to true, the function will return true if the calculated distance is equal to the given Distance
 	 * @return	True if the distance between the sprites is less than the given Distance 
 	 */
 	public static inline function isDistanceToTouchWithin(Sprite:FlxSprite, Touch:FlxTouch, Distance:Float, IncludeEqual:Bool = false):Bool
@@ -483,14 +451,11 @@ class FlxMath
 	#end
 	
 	/**
-	 * Returns the amount of decimals a Float has
-	 * 
-	 * @param	Number	The floating point number
-	 * @return	Amount of decimals
+	 * Returns the amount of decimals a `Float` has.
 	 */
-	public static function getDecimals(Number:Float):Int
+	public static function getDecimals(n:Float):Int
 	{
-		var helperArray:Array<String> = Std.string(Number).split(".");
+		var helperArray:Array<String> = Std.string(n).split(".");
 		var decimals:Int = 0;
 		
 		if (helperArray.length > 1)
@@ -501,24 +466,100 @@ class FlxMath
 		return decimals;
 	}
 	
-	public static inline function equal(aValueA:Float, aValueB:Float, aDiff:Float = 0.00001):Bool
+	public static inline function equal(aValueA:Float, aValueB:Float, aDiff:Float = EPSILON):Bool
 	{
-		return (Math.abs(aValueA - aValueB) <= aDiff);
+		return Math.abs(aValueA - aValueB) <= aDiff;
 	}
 	
 	/**
-	 * Returns -1 if the number is smaller than 0 and 1 otherwise
+	 * Returns `-1` if the number is smaller than `0` and `1` otherwise
 	 */
-	public static inline function signOf(f:Float):Int
+	public static inline function signOf(n:Float):Int
 	{
-		return (f < 0) ? -1 : 1;
+		return (n < 0) ? -1 : 1;
 	}
 	
 	/**
-	 * Checks if two numbers have the same sign (using signOf()).
+	 * Checks if two numbers have the same sign (using `FlxMath.signOf()`).
 	 */
-	public static inline function sameSign(f1:Float, f2:Float):Bool
+	public static inline function sameSign(a:Float, b:Float):Bool
 	{
-		return signOf(f1) == signOf(f2);
+		return signOf(a) == signOf(b);
+	}
+	
+	/**
+	 * A faster but slightly less accurate version of `Math.sin()`.
+	 * About 2-6 times faster with < 0.05% average error.
+	 * 
+	 * @param	n	The angle in radians.
+	 * @return	An approximated sine of `n`.
+	 */
+	public static inline function fastSin(n:Float):Float
+	{
+		n *= 0.3183098862; // divide by pi to normalize
+		
+		// bound between -1 and 1
+		if (n > 1) 
+		{
+			n -= (Math.ceil(n) >> 1) << 1;
+		}
+		else if (n < -1)
+		{
+			n += (Math.ceil(-n) >> 1) << 1;
+		}
+		
+		// this approx only works for -pi <= rads <= pi, but it's quite accurate in this region
+		if (n > 0)
+		{
+			return n * (3.1 + n * (0.5 + n * (-7.2 + n * 3.6)));
+		}
+		else
+		{
+			return n * (3.1 - n * (0.5 + n * (7.2 + n * 3.6)));
+		}
+	}
+	
+	/**
+	 * A faster, but less accurate version of `Math.cos()`.
+	 * About 2-6 times faster with < 0.05% average error.
+	 * 
+	 * @param	n	The angle in radians.
+	 * @return	An approximated cosine of `n`.
+	 */
+	public static inline function fastCos(n:Float):Float
+	{
+		return fastSin(n + 1.570796327); // sin and cos are the same, offset by pi/2
+	}
+	
+	/**
+	 * Hyperbolic sine.
+	 */
+	public static inline function sinh(n:Float):Float
+	{
+		return (Math.exp(n) - Math.exp(-n)) / 2;
+	}
+	
+	/**
+	 * Returns the bigger argument.
+	 */
+	public static inline function maxInt(a:Int, b:Int):Int
+	{
+		return (a > b) ? a : b;
+	}
+	
+	/**
+	 * Returns the smaller argument.
+	 */
+	public static inline function minInt(a:Int, b:Int):Int
+	{
+		return (a > b) ? b : a;
+	}
+	
+	/**
+	 * Returns the absolute integer value.
+	 */
+	public static inline function absInt(n:Int):Int
+	{
+		return (n > 0) ? n : -n;
 	}
 }

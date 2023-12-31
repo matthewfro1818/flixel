@@ -1,8 +1,7 @@
 package flixel.math;
 
-import flixel.FlxG;
 import flixel.FlxSprite;
-#if !FLX_NO_TOUCH
+#if FLX_TOUCH
 import flixel.input.touch.FlxTouch;
 #end
 
@@ -50,11 +49,10 @@ class FlxVelocity
 	public static function accelerateTowardsObject(Source:FlxSprite, Dest:FlxSprite, Acceleration:Float, MaxSpeed:Float):Void
 	{
 		var a:Float = FlxAngle.angleBetween(Source, Dest);
-		
 		accelerateFromAngle(Source, a, Acceleration, MaxSpeed);
 	}
 	
-	#if !FLX_NO_MOUSE
+	#if FLX_MOUSE
 	/**
 	 * Move the given FlxSprite towards the mouse pointer coordinates at a steady velocity
 	 * If you specify a maxTime then it will adjust the speed (over-writing what you set) so it arrives at the destination in that number of seconds.
@@ -82,7 +80,7 @@ class FlxVelocity
 	}
 	#end
 	
-	#if !FLX_NO_TOUCH
+	#if FLX_TOUCH
 	/**
 	 * Move the given FlxSprite towards a FlxTouch point at a steady velocity
 	 * If you specify a maxTime then it will adjust the speed (over-writing what you set) so it arrives at the destination in that number of seconds.
@@ -110,7 +108,7 @@ class FlxVelocity
 	}
 	#end
 	
-	#if !FLX_NO_MOUSE
+	#if FLX_MOUSE
 	/**
 	 * Sets the x/y acceleration on the source FlxSprite so it will move towards the mouse coordinates at the speed given (in pixels per second)
 	 * You must give a maximum speed value, beyond which the FlxSprite won't go any faster.
@@ -128,7 +126,7 @@ class FlxVelocity
 	}
 	#end
 	
-	#if !FLX_NO_TOUCH
+	#if FLX_TOUCH
 	/**
 	 * Sets the x/y acceleration on the source FlxSprite so it will move towards a FlxTouch at the speed given (in pixels per second)
 	 * You must give a maximum speed value, beyond which the FlxSprite won't go any faster.
@@ -218,7 +216,7 @@ class FlxVelocity
 	 */
 	public static function velocityFromFacing(Parent:FlxSprite, Speed:Float):FlxPoint
 	{
-		var a = FlxAngle.angleFromFacing(Parent);
+		var a = FlxAngle.angleFromFacing(Parent.facing);
 		return FlxPoint.get(Math.cos(a) * Speed, Math.sin(a) * Speed);
 	}
 	
@@ -229,20 +227,21 @@ class FlxVelocity
 	 * @param	Acceleration		Rate at which the velocity is changing.
 	 * @param	Drag			Really kind of a deceleration, this is how much the velocity changes if Acceleration is not set.
 	 * @param	Max				An absolute value cap for the velocity (0 for no cap).
+	 * @param	Elapsed			The amount of time passed in to the latest update cycle
 	 * @return	The altered Velocity value.
 	 */
-	public static function computeVelocity(Velocity:Float, Acceleration:Float, Drag:Float, Max:Float):Float
+	public static function computeVelocity(Velocity:Float, Acceleration:Float, Drag:Float, Max:Float, Elapsed:Float):Float
 	{
 		if (Acceleration != 0)
 		{
-			Velocity += Acceleration * FlxG.elapsed;
+			Velocity += Acceleration * Elapsed;
 		}
 		else if (Drag != 0)
 		{
-			var drag:Float = Drag * FlxG.elapsed;
+			var drag:Float = Drag * Elapsed;
 			if (Velocity - drag > 0)
 			{
-				Velocity = Velocity - drag;
+				Velocity -= drag;
 			}
 			else if (Velocity + drag < 0)
 			{
@@ -266,16 +265,26 @@ class FlxVelocity
 		}
 		return Velocity;
 	}
-	
+
+	/**
+	 * Sets the x/y acceleration on the source FlxSprite so it will accelerate in the direction of the specified angle.
+	 * You must give a maximum speed value (in pixels per second), beyond which the FlxSprite won't go any faster.
+	 * 
+	 * @param	Source			The FlxSprite on which the acceleration will be set
+	 * @param	Radians			The angle in which the FlxPoint will be set to accelerate
+	 * @param	Acceleration	The speed it will accelerate in pixels per second
+	 * @param	MaxSpeed		The maximum speed in pixels per second in which the sprite can move
+	 * @param	ResetVelocity	Whether to reset the FlxSprite velocity to 0 each time
+	 */
 	public static inline function accelerateFromAngle(source:FlxSprite, radians:Float, acceleration:Float, maxSpeed:Float, resetVelocity:Bool = true):Void
 	{
-		var sin = Math.sin(radians);
-		var cos = Math.cos(radians);
+		var sinA = Math.sin(radians);
+		var cosA = Math.cos(radians);
 		
-		if(resetVelocity)
+		if (resetVelocity)
 			source.velocity.set(0, 0);
 		
-		source.acceleration.set(cos * acceleration, sin * acceleration);
-		source.maxVelocity.set(cos * maxSpeed, sin * maxSpeed);		
+		source.acceleration.set(cosA * acceleration, sinA * acceleration);
+		source.maxVelocity.set(Math.abs(cosA * maxSpeed), Math.abs(sinA * maxSpeed));		
 	}
 }
