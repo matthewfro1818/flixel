@@ -1,4 +1,7 @@
-package flixel.tweens.motion;
+﻿package flixel.tweens.motion;
+
+import flixel.tweens.FlxEase.EaseFunction;
+import flixel.tweens.FlxTween;
 
 /**
  * Determines motion along a cubic curve.
@@ -6,20 +9,20 @@ package flixel.tweens.motion;
 class CubicMotion extends Motion
 {
 	// Curve information.
-	var _fromX:Float = 0;
-	var _fromY:Float = 0;
-	var _toX:Float = 0;
-	var _toY:Float = 0;
-	var _aX:Float = 0;
-	var _aY:Float = 0;
-	var _bX:Float = 0;
-	var _bY:Float = 0;
-	var _ttt:Float = 0;
-	var _tt:Float = 0;
-
+	private var _fromX:Float = 0;
+	private var _fromY:Float = 0;
+	private var _toX:Float = 0;
+	private var _toY:Float = 0;
+	private var _aX:Float = 0;
+	private var _aY:Float = 0;
+	private var _bX:Float = 0;
+	private var _bY:Float = 0;
+	private var _ttt:Float = 0;
+	private var _tt:Float = 0;
+	
 	/**
 	 * Starts moving along the curve.
-	 *
+	 * 
 	 * @param	fromX		X start.
 	 * @param	fromY		Y start.
 	 * @param	aX			First control x.
@@ -44,18 +47,12 @@ class CubicMotion extends Motion
 		start();
 		return this;
 	}
-
-	override function update(elapsed:Float):Void
+	
+	override private function update():Void
 	{
-		super.update(elapsed);
-		x = scale * scale * scale * (_toX + 3 * (_aX - _bX) - _fromX)
-			+ 3 * scale * scale * (_fromX - 2 * _aX + _bX)
-			+ 3 * scale * (_aX - _fromX)
-			+ _fromX;
-		y = scale * scale * scale * (_toY + 3 * (_aY - _bY) - _fromY)
-			+ 3 * scale * scale * (_fromY - 2 * _aY + _bY)
-			+ 3 * scale * (_aY - _fromY)
-			+ _fromY;
+		super.update();
+		x = scale * scale * scale * (_toX + 3 * (_aX - _bX) - _fromX) + 3 * scale * scale * (_fromX - 2 * _aX + _bX) + 3 * scale * (_aX - _fromX) + _fromX;
+		y = scale * scale * scale * (_toY + 3 * (_aY - _bY) - _fromY) + 3 * scale * scale * (_fromY - 2 * _aY + _bY) + 3 * scale * (_aY - _fromY) + _fromY;
 		if (finished)
 		{
 			postUpdate();

@@ -1,142 +1,86 @@
 package flixel.tile;
 
 import openfl.display.BitmapData;
+import openfl.geom.Matrix;
 import openfl.geom.Point;
 import openfl.geom.Rectangle;
 import flixel.FlxCamera;
 import flixel.FlxG;
-import flixel.math.FlxMatrix;
-import flixel.tile.FlxTilemap;
 import flixel.util.FlxColor;
-import flixel.util.FlxDestroyUtil;
-import openfl.display.BlendMode;
-import openfl.geom.ColorTransform;
 
 /**
  * A helper object to keep tilemap drawing performance decent across the new multi-camera system.
  * Pretty much don't even have to think about this class unless you are doing some crazy hacking.
  */
-class FlxTilemapBuffer implements IFlxDestroyable
+class FlxTilemapBuffer
 {
 	/**
 	 * The current X position of the buffer.
 	 */
 	public var x:Float = 0;
-
 	/**
 	 * The current Y position of the buffer.
 	 */
 	public var y:Float = 0;
-
 	/**
 	 * The width of the buffer (usually just a few tiles wider than the camera).
 	 */
 	public var width:Float = 0;
-
 	/**
 	 * The height of the buffer (usually just a few tiles taller than the camera).
 	 */
 	public var height:Float = 0;
-
 	/**
 	 * Whether the buffer needs to be redrawn.
 	 */
 	public var dirty:Bool = false;
-
 	/**
 	 * How many rows of tiles fit in this buffer.
 	 */
 	public var rows:Int = 0;
-
 	/**
 	 * How many columns of tiles fit in this buffer.
 	 */
 	public var columns:Int = 0;
-
 	/**
-	 * Whether or not the coordinates should be rounded during draw(), true by default (recommended for pixel art).
+	 * Whether or not the coordinates should be rounded during draw(), true by default (recommended for pixel art). 
 	 * Only affects tilesheet rendering and rendering using BitmapData.draw() in blitting.
 	 * (copyPixels() only renders on whole pixels by nature). Causes draw() to be used if false, which is more expensive.
 	 */
 	public var pixelPerfectRender:Null<Bool>;
-
+	
+	#if FLX_RENDER_BLIT
 	/**
-	 * The actual buffer BitmapData. (Only used if FlxG.renderBlit == true)
-	 */
+	 * The actual buffer BitmapData.
+	 */ 
 	public var pixels(default, null):BitmapData;
-
-	public var blend:BlendMode;
-	public var antialiasing:Bool = false;
-
-	var _flashRect:Rectangle;
-	var _matrix:FlxMatrix;
-
-	/**
-	 * Variables related to calculation of dirty value
-	 */
-	var _prevTilemapX:Float;
-
-	var _prevTilemapY:Float;
-	var _prevTilemapScaleX:Float;
-	var _prevTilemapScaleY:Float;
-	var _prevTilemapScrollX:Float;
-	var _prevTilemapScrollY:Float;
-	var _prevCameraScrollX:Float;
-	var _prevCameraScrollY:Float;
-	var _prevCameraScaleX:Float;
-	var _prevCameraScaleY:Float;
-	var _prevCameraWidth:Int;
-	var _prevCameraHeight:Int;
+	
+	private var _flashRect:Rectangle;
+	private var _matrix:Matrix;
+	#end
 
 	/**
 	 * Instantiates a new camera-specific buffer for storing the visual tilemap data.
-	 *
-	 * @param   tileWidth      The width of the tiles in this tilemap.
-	 * @param   tileHeight     The height of the tiles in this tilemap.
-	 * @param   widthInTiles   How many tiles wide the tilemap is.
-	 * @param   heightInTiles  How many tiles tall the tilemap is.
-	 * @param   camera         Which camera this buffer relates to.
+	 * 
+	 * @param   TileWidth       The width of the tiles in this tilemap.
+	 * @param   TileHeight      The height of the tiles in this tilemap.
+	 * @param   WidthInTiles    How many tiles wide the tilemap is.
+	 * @param   HeightInTiles   How many tiles tall the tilemap is.
+	 * @param   Camera          Which camera this buffer relates to.
 	 */
-	public function new(tileWidth, tileHeight, widthInTiles, heightInTiles, ?camera, scaleX = 1.0, scaleY = 1.0)
+	public function new(TileWidth:Int, TileHeight:Int, WidthInTiles:Int, HeightInTiles:Int,
+		?Camera:FlxCamera,ScaleX:Float = 1.0, ScaleY:Float = 1.0)
 	{
-		resize(tileWidth, tileHeight, widthInTiles, heightInTiles, camera, scaleX, scaleY);
-	}
-	
-	/**
-	 * Creates a bitmapData buffer from the tilemap's info.
-	 *
-	 * @param   tileWidth      The width of the tiles in this tilemap.
-	 * @param   tileHeight     The height of the tiles in this tilemap.
-	 * @param   widthInTiles   How many tiles wide the tilemap is.
-	 * @param   heightInTiles  How many tiles tall the tilemap is.
-	 * @param   camera         Which camera this buffer relates to.
-	 */
-	public function resize(tileWidth:Int, tileHeight:Int, widthInTiles:Int, heightInTiles:Int, ?camera:FlxCamera,
-			scaleX = 1.0, scaleY = 1.0):Void
-	{
-		updateColumns(tileWidth, widthInTiles, scaleX, camera);
-		updateRows(tileHeight, heightInTiles, scaleY, camera);
-
-		if (FlxG.renderBlit)
-		{
-			final newWidth = Std.int(columns * tileWidth);
-			final newHeight = Std.int(rows * tileHeight);
-			
-			if (pixels == null)
-			{
-				pixels = new BitmapData(newWidth, newHeight, true, 0);
-				_flashRect = new Rectangle(0, 0, newWidth, newHeight);
-				_matrix = new FlxMatrix();
-				dirty = true;
-			}
-			else if (pixels.width != newWidth || pixels.height != newHeight)
-			{
-				FlxDestroyUtil.dispose(pixels);
-				pixels = new BitmapData(newWidth, newHeight, true, 0);
-				_flashRect.setTo(0, 0, newWidth, newHeight);
-				dirty = true;
-			}
-		}
+		updateColumns(TileWidth, WidthInTiles, ScaleX, Camera);
+		updateRows(TileHeight, HeightInTiles, ScaleY, Camera);
+		
+		#if FLX_RENDER_BLIT
+		pixels = new BitmapData(Std.int(columns * TileWidth), Std.int(rows * TileHeight), true, 0);
+		_flashRect = new Rectangle(0, 0, pixels.width, pixels.height);
+		_matrix = new Matrix();
+		#end
+		
+		dirty = true;
 	}
 	
 	/**
@@ -144,149 +88,109 @@ class FlxTilemapBuffer implements IFlxDestroyable
 	 */
 	public function destroy():Void
 	{
-		if (FlxG.renderBlit)
-		{
-			pixels = FlxDestroyUtil.dispose(pixels);
-			blend = null;
-			_matrix = null;
-			_flashRect = null;
-		}
+		#if FLX_RENDER_BLIT
+		pixels = null;
+		_matrix = null;
+		#end
 	}
 	
 	/**
 	 * Fill the buffer with the specified color.
 	 * Default value is transparent.
-	 *
-	 * @param   color  What color to fill with, in 0xAARRGGBB hex format.
+	 * 
+	 * @param	Color	What color to fill with, in 0xAARRGGBB hex format.
 	 */
-	public function fill(color = FlxColor.TRANSPARENT):Void
+	#if FLX_RENDER_BLIT
+	public function fill(Color:FlxColor = FlxColor.TRANSPARENT):Void
 	{
-		if (FlxG.renderBlit)
-		{
-			pixels.fillRect(_flashRect, color);
-		}
+		pixels.fillRect(_flashRect, Color);
 	}
 	
 	/**
 	 * Just stamps this buffer onto the specified camera at the specified location.
-	 *
-	 * @param   camera      Which camera to draw the buffer onto.
-	 * @param   flashPoint  Where to draw the buffer at in camera coordinates.
+	 * 
+	 * @param	Camera		Which camera to draw the buffer onto.
+	 * @param	FlashPoint	Where to draw the buffer at in camera coordinates.
 	 */
-	public function draw(camera:FlxCamera, flashPoint:Point, scaleX = 1.0, scaleY = 1.0):Void
+	public function draw(Camera:FlxCamera, FlashPoint:Point, ScaleX:Float = 1.0, ScaleY:Float = 1.0):Void
 	{
-		if (isPixelPerfectRender(camera))
+		if (isPixelPerfectRender(Camera))
 		{
-			flashPoint.x = Math.floor(flashPoint.x);
-			flashPoint.y = Math.floor(flashPoint.y);
+			FlashPoint.x = Math.floor(FlashPoint.x);
+			FlashPoint.y = Math.floor(FlashPoint.y);
 		}
 		
-		if (isPixelPerfectRender(camera) && (scaleX == 1.0 && scaleY == 1.0) && blend == null)
+		if (isPixelPerfectRender(Camera) && (ScaleX == 1.0 && ScaleY == 1.0))
 		{
-			camera.copyPixels(pixels, _flashRect, flashPoint, null, null, true);
+			Camera.buffer.copyPixels(pixels, _flashRect, FlashPoint, null, null, true);
 		}
 		else
 		{
 			_matrix.identity();
-			_matrix.scale(scaleX, scaleY);
-			_matrix.translate(flashPoint.x, flashPoint.y);
-			camera.drawPixels(pixels, _matrix, null, blend, antialiasing);
+			_matrix.scale(ScaleX, ScaleY);
+			_matrix.translate(FlashPoint.x, FlashPoint.y);
+			Camera.buffer.draw(pixels, _matrix);
 		}
 	}
+	#end
 	
-	public function colorTransform(transform:ColorTransform):Void
+	public function updateColumns(TileWidth:Int, WidthInTiles:Int, ScaleX:Float = 1.0, ?Camera:FlxCamera):Void
 	{
-		pixels.colorTransform(_flashRect, transform);
-	}
-	
-	@:access(flixel.FlxCamera.viewWidth)
-	public function updateColumns(tileWidth:Int, widthInTiles:Int, scaleX = 1.0, ?camera:FlxCamera):Void
-	{
-		if (widthInTiles < 0)
-			widthInTiles = 0;
+		if (WidthInTiles < 0) 
+		{
+			WidthInTiles = 0;
+		}
 		
-		if (camera == null)
-			camera = FlxG.camera;
+		if (Camera == null)
+		{
+			Camera = FlxG.camera;
+		}
+
+		columns = Math.ceil(Camera.width / (TileWidth * ScaleX)) + 1;
 		
-		columns = Math.ceil(camera.viewWidth / (tileWidth * scaleX)) + 1;
+		if (columns > WidthInTiles)
+		{
+			columns = WidthInTiles;
+		}
 		
-		if (columns > widthInTiles)
-			columns = widthInTiles;
-		
-		width = Std.int(columns * tileWidth * scaleX);
+		width = Std.int(columns * TileWidth * ScaleX);
 		
 		dirty = true;
 	}
 	
-	@:access(flixel.FlxCamera.viewHeight)
-	public function updateRows(tileHeight:Int, heightInTiles:Int, scaleY = 1.0, ?camera:FlxCamera):Void
+	public function updateRows(TileHeight:Int, HeightInTiles:Int, ScaleY:Float = 1.0, ?Camera:FlxCamera):Void
 	{
-		if (heightInTiles < 0)
-			heightInTiles = 0;
+		if (HeightInTiles < 0) 
+		{
+			HeightInTiles = 0;
+		}
 		
-		if (camera == null)
-			camera = FlxG.camera;
+		if (Camera == null)
+		{
+			Camera = FlxG.camera;
+		}
 		
-		rows = Math.ceil(camera.viewHeight / (tileHeight * scaleY)) + 1;
+		rows = Math.ceil(Camera.height / (TileHeight * ScaleY)) + 1;
 		
-		if (rows > heightInTiles)
-			rows = heightInTiles;
+		if (rows > HeightInTiles)
+		{
+			rows = HeightInTiles;
+		}
 		
-		height = Std.int(rows * tileHeight * scaleY);
+		height = Std.int(rows * TileHeight * ScaleY);	
 		
 		dirty = true;
 	}
-	
+
 	/**
 	 * Check if object is rendered pixel perfect on a specific camera.
 	 */
-	public function isPixelPerfectRender(?camera:FlxCamera):Bool
+	public function isPixelPerfectRender(?Camera:FlxCamera):Bool
 	{
-		if (camera == null)
-			camera = FlxG.camera;
-		
-		return pixelPerfectRender == null ? camera.pixelPerfectRender : pixelPerfectRender;
-	}
-	
-	/**
-	 * Check if tilemap or camera has changed (scrolled, moved, resized or scaled) since the previous frame.
-	 * If so, then it means that we need to redraw this buffer.
-	 * @param   tilemap  Tilemap to check against. It's a tilemap this buffer belongs to.
-	 * @param   camera   Camera to check against. It's a camera this buffer is used for drawing on.
-	 * @return  The value of dirty flag.
-	 */
-	public function isDirty<Tile:FlxTile>(tilemap:FlxTypedTilemap<Tile>, camera:FlxCamera):Bool
-	{
-		dirty = dirty
-			|| (tilemap.x != _prevTilemapX)
-			|| (tilemap.y != _prevTilemapY)
-			|| (tilemap.scale.x != _prevTilemapScaleX)
-			|| (tilemap.scale.y != _prevTilemapScaleY)
-			|| (tilemap.scrollFactor.x != _prevTilemapScrollX)
-			|| (tilemap.scrollFactor.y != _prevTilemapScrollY)
-			|| (camera.scroll.x != _prevCameraScrollX)
-			|| (camera.scroll.y != _prevCameraScrollY)
-			|| (camera.scaleX != _prevCameraScaleX)
-			|| (camera.scaleY != _prevCameraScaleY)
-			|| (camera.width != _prevCameraWidth)
-			|| (camera.height != _prevCameraHeight);
-		
-		if (dirty)
+		if (Camera == null)
 		{
-			_prevTilemapX = tilemap.x;
-			_prevTilemapY = tilemap.y;
-			_prevTilemapScaleX = tilemap.scale.x;
-			_prevTilemapScaleY = tilemap.scale.y;
-			_prevTilemapScrollX = tilemap.scrollFactor.x;
-			_prevTilemapScrollY = tilemap.scrollFactor.y;
-			_prevCameraScrollX = camera.scroll.x;
-			_prevCameraScrollY = camera.scroll.y;
-			_prevCameraScaleX = camera.scaleX;
-			_prevCameraScaleY = camera.scaleY;
-			_prevCameraWidth = camera.width;
-			_prevCameraHeight = camera.height;
+			Camera = FlxG.camera;
 		}
-		
-		return dirty;
+		return pixelPerfectRender == null ? Camera.pixelPerfectRender : pixelPerfectRender;
 	}
 }

@@ -12,15 +12,13 @@ import openfl.geom.ColorTransform;
 import openfl.geom.Matrix;
 import openfl.geom.Point;
 import openfl.geom.Rectangle;
+import flixel.effects.FlxFlicker;
 import flixel.FlxG;
 import flixel.FlxObject;
 import flixel.FlxSprite;
-import flixel.effects.FlxFlicker;
 import flixel.math.FlxMath;
 import flixel.math.FlxPoint;
-import flixel.math.FlxRect;
 import flixel.system.FlxAssets;
-import flixel.tweens.FlxEase;
 import flixel.tweens.FlxTween;
 
 // TODO: pad(): Pad the sprite out with empty pixels left/right/above/below it
@@ -28,7 +26,7 @@ import flixel.tweens.FlxTween;
 
 /**
  * Some handy functions for FlxSprite (FlxObject) manipulation, mostly drawing-related.
- * Note that stage quality impacts the results of the draw() functions -
+ * Note that stage quality impacts the results of the draw() functions - 
  * use FlxG.stage.quality = openfl.display.StageQuality.BEST; for best results.
  */
 class FlxSpriteUtil
@@ -38,46 +36,69 @@ class FlxSpriteUtil
 	 * Primarily used for "debug visuals" like drawing bounding boxes directly to the screen buffer.
 	 */
 	public static var flashGfxSprite(default, null):Sprite = new Sprite();
-
 	public static var flashGfx(default, null):Graphics = flashGfxSprite.graphics;
-
+	
 	/**
 	 * Takes two source images (typically from Embedded bitmaps) and puts the resulting image into the output FlxSprite.
 	 * Note: It assumes the source and mask are the same size. Different sizes may result in undesired results.
 	 * It works by copying the source image (your picture) into the output sprite. Then it removes all areas of it that do not
 	 * have an alpha color value in the mask image. So if you draw a big black circle in your mask with a transparent edge, you'll
-	 * get a circular image to appear.
-	 * May lead to unexpected results if `source` does not have an alpha channel.
-	 *
+	 * get a circular image appear. Look at the mask PNG files in the assets/pics folder for examples.
+	 * 
 	 * @param	output		The FlxSprite you wish the resulting image to be placed in (will adjust width/height of image)
 	 * @param	source		The source image. Typically the one with the image / picture / texture in it.
 	 * @param	mask		The mask to apply. Remember the non-alpha zero areas are the parts that will display.
 	 * @return 	The FlxSprite for chaining
 	 */
-	public static function alphaMask(output:FlxSprite, source:FlxGraphicSource, mask:FlxGraphicSource):FlxSprite
+	public static function alphaMask(output:FlxSprite, source:Dynamic, mask:Dynamic):FlxSprite
 	{
-		var data:BitmapData = FlxAssets.resolveBitmapData(source);
-		var maskData:BitmapData = FlxAssets.resolveBitmapData(mask);
-
-		if (data == null || maskData == null)
+		var data:BitmapData = null;
+		if (Std.is(source, String))
+		{
+			data = FlxAssets.getBitmapData(source);
+		}
+		else if (Std.is(source, Class))
+		{
+			data = Type.createInstance(source, []).bitmapData;
+		}
+		else if (Std.is(source, BitmapData))
+		{
+			data = cast(source, BitmapData).clone();
+		}
+		else
 		{
 			return null;
 		}
-
-		data = data.clone();
+		var maskData:BitmapData = null;
+		if (Std.is(mask, String))
+		{
+			maskData = FlxAssets.getBitmapData(mask);
+		}
+		else if (Std.is(mask, Class))
+		{
+			maskData = Type.createInstance(mask, []).bitmapData;
+		}
+		else if (Std.is(mask, BitmapData))
+		{
+			maskData = mask;
+		}
+		else
+		{
+			return null;
+		}
+		
 		data.copyChannel(maskData, new Rectangle(0, 0, data.width, data.height), new Point(), BitmapDataChannel.ALPHA, BitmapDataChannel.ALPHA);
 		output.pixels = data;
 		return output;
 	}
-
+	
 	/**
 	 * Takes the image data from two FlxSprites and puts the resulting image into the output FlxSprite.
 	 * Note: It assumes the source and mask are the same size. Different sizes may result in undesired results.
 	 * It works by copying the source image (your picture) into the output sprite. Then it removes all areas of it that do not
 	 * have an alpha color value in the mask image. So if you draw a big black circle in your mask with a transparent edge, you'll
 	 * get a circular image appear.
-	 * May lead to unexpected results if `sprite`'s graphic does not have an alpha channel.
-	 *
+	 * 
 	 * @param	sprite		The source FlxSprite. Typically the one with the image / picture / texture in it.
 	 * @param	mask		The FlxSprite containing the mask to apply. Remember the non-alpha zero areas are the parts that will display.
 	 * @param	output		The FlxSprite you wish the resulting image to be placed in (will adjust width/height of image)
@@ -88,14 +109,14 @@ class FlxSpriteUtil
 		sprite.drawFrame();
 		var data:BitmapData = sprite.pixels.clone();
 		data.copyChannel(mask.pixels, new Rectangle(0, 0, sprite.width, sprite.height), new Point(), BitmapDataChannel.ALPHA, BitmapDataChannel.ALPHA);
-		output.pixels = data;
+		output.pixels = data;	
 		return output;
 	}
-
+	
 	/**
-	 * Checks the x/y coordinates of the FlxSprite and keeps them within the
+	 * Checks the x/y coordinates of the FlxSprite and keeps them within the 
 	 * area of 0, 0, FlxG.width, FlxG.height (i.e. wraps it around the screen)
-	 *
+	 * 
 	 * @param	sprite		The FlxSprite to keep within the screen
 	 * @param	Left		Whether to activate screen wrapping on the left side of the screen
 	 * @param	Right		Whether to activate screen wrapping on the right side of the screen
@@ -105,20 +126,20 @@ class FlxSpriteUtil
 	 */
 	public static function screenWrap(sprite:FlxSprite, Left:Bool = true, Right:Bool = true, Top:Bool = true, Bottom:Bool = true):FlxSprite
 	{
-		if (Left && ((sprite.x + sprite.frameWidth / 2) <= 0))
+		if (Left && ((sprite.x + sprite.frameWidth) <= 0)) 
 		{
 			sprite.x = FlxG.width;
 		}
-		else if (Right && (sprite.x >= FlxG.width))
+		else if (Right && (sprite.x >= FlxG.width)) 
 		{
 			sprite.x = 0;
 		}
-
-		if (Top && ((sprite.y + sprite.frameHeight / 2) <= 0))
+		
+		if (Top && ((sprite.y + sprite.frameHeight) <= 0)) 
 		{
 			sprite.y = FlxG.height;
 		}
-		else if (Bottom && (sprite.y >= FlxG.height))
+		else if (Bottom && (sprite.y >= FlxG.height)) 
 		{
 			sprite.y = 0;
 		}
@@ -128,7 +149,7 @@ class FlxSpriteUtil
 	/**
 	 * Makes sure a FlxSprite doesn't leave the specified area - most common use case is to call this every frame in update().
 	 * If you call this without specifying an area, the game area (FlxG.width / height as max) will be used. Takes the graphic size into account.
-	 *
+	 * 
 	 * @param	sprite	The FlxSprite to bound to an area
 	 * @param	MinX	The minimum x position allowed
 	 * @param	MaxX	The maximum x position allowed
@@ -146,264 +167,128 @@ class FlxSpriteUtil
 		{
 			MaxY = FlxG.height;
 		}
-
+		
 		MaxX -= sprite.frameWidth;
 		MaxY -= sprite.frameHeight;
-
+		
 		sprite.x = FlxMath.bound(sprite.x, MinX, MaxX);
 		sprite.y = FlxMath.bound(sprite.y, MinY, MaxY);
-
-		return sprite;
-	}
-
-	/**
-	 * Checks the sprite's screen bounds of the FlxSprite and keeps them within the camera by wrapping it around.
-	 *
-	 * @param	sprite	The FlxSprite to wrap.
-	 * @param	camera	The camera to wrap around. If left null, `FlxG.camera` is used.
-	 * @param	edges	The edges FROM which to wrap. Use constants like `LEFT`, `RIGHT`, `UP|DOWN` or `ANY`.
-	 * @return	The FlxSprite for chaining
-	 * @since 4.11.0
-	 */
-	public static function cameraWrap(sprite:FlxSprite, ?camera:FlxCamera, edges:FlxDirectionFlags = ANY):FlxSprite
-	{
-		if (camera == null)
-			camera = FlxG.camera;
-		
-		var spriteBounds = sprite.getScreenBounds(camera);
-		var offset = FlxPoint.get(
-			sprite.x - spriteBounds.x - camera.scroll.x,
-			sprite.y - spriteBounds.y - camera.scroll.y
-		);
-		
-		if (edges.has(LEFT) && spriteBounds.right < camera.viewMarginLeft)
-			sprite.x = camera.viewRight + offset.x;
-		else if (edges.has(RIGHT) && spriteBounds.left > camera.viewMarginRight)
-			sprite.x = camera.viewLeft + offset.x - spriteBounds.width;
-		
-		if (edges.has(UP) && spriteBounds.bottom < camera.viewMarginTop)
-			sprite.y = camera.viewBottom + offset.y;
-		else if (edges.has(DOWN) && spriteBounds.top > camera.viewMarginBottom)
-			sprite.y = camera.viewTop + offset.y - spriteBounds.height;
-		
-		spriteBounds.put();
-		offset.put();
-		
-		return sprite;
-	}
-	
-	/**
-	 * Checks the sprite's screen bounds and keeps it entirely within the camera.
-	 *
-	 * @param	sprite	The FlxSprite to restrict.
-	 * @param	camera	The camera resitricting the sprite. If left null, `FlxG.camera` is used.
-	 * @param	edges	The edges to restrict. Use constants like `LEFT`, `RIGHT`, `UP|DOWN` or `ANY`.
-	 * @return	The FlxSprite for chaining
-	 * @since 4.11.0
-	 */
-	public static function cameraBound(sprite:FlxSprite, ?camera:FlxCamera, edges:FlxDirectionFlags = ANY):FlxSprite
-	{
-		if (camera == null)
-			camera = FlxG.camera;
-		
-		var spriteBounds = sprite.getScreenBounds(camera);
-		var offset = FlxPoint.get(
-			sprite.x - spriteBounds.x - camera.scroll.x,
-			sprite.y - spriteBounds.y - camera.scroll.y
-		);
-		
-		if (edges.has(LEFT) && spriteBounds.left < camera.viewMarginLeft)
-			sprite.x = camera.viewLeft + offset.x;
-		else if (edges.has(RIGHT) && spriteBounds.right > camera.viewMarginRight)
-			sprite.x = camera.viewRight + offset.x - spriteBounds.width;
-		
-		if (edges.has(UP) && spriteBounds.top < camera.viewMarginTop)
-			sprite.y = camera.viewTop + offset.y;
-		else if (edges.has(DOWN) && spriteBounds.bottom > camera.viewMarginBottom)
-			sprite.y = camera.viewBottom + offset.y - spriteBounds.height;
-		
-		spriteBounds.put();
-		offset.put();
 		
 		return sprite;
 	}
 	
 	/**
 	 * Aligns a set of FlxObjects so there is equal spacing between them
-	 *
+	 * 
 	 * @param	objects				An Array of FlxObjects
 	 * @param	startX				The base X coordinate to start the spacing from
 	 * @param	startY				The base Y coordinate to start the spacing from
-	 * @param	horizontalSpacing	The amount of pixels between each sprite horizontally. Set to `null` to just keep the current X position of each object.
-	 * @param	verticalSpacing		The amount of pixels between each sprite vertically. Set to `null` to just keep the current Y position of each object.
+	 * @param	horizontalSpacing	The amount of pixels between each sprite horizontally (default 0)
+	 * @param	verticalSpacing		The amount of pixels between each sprite vertically (default 0)
 	 * @param	spaceFromBounds		If set to true the h/v spacing values will be added to the width/height of the sprite, if false it will ignore this
-	 * @param	position			A function with the signature `(target:FlxObject, x:Float, y:Float):Void`. You can use this to tween objects into their spaced position, etc.
 	 */
-	public static function space(objects:Array<FlxObject>, startX:Float, startY:Float, ?horizontalSpacing:Float, ?verticalSpacing:Float,
-			spaceFromBounds:Bool = false, ?position:FlxObject->Float->Float->Void):Void
+	public static function space(objects:Array<FlxObject>, startX:Int, startY:Int, horizontalSpacing:Int = 0, 
+		verticalSpacing:Int = 0, spaceFromBounds:Bool = false):Void
 	{
-		var prevWidth:Float = 0;
-		var runningX:Float = 0;
-
-		if (horizontalSpacing != null)
-		{
-			if (spaceFromBounds)
-			{
-				prevWidth = objects[0].width;
-			}
-			runningX = startX;
-		}
-		else
-		{
-			runningX = objects[0].x;
-		}
-
-		var prevHeight:Float = 0;
-		var runningY:Float = 0;
-
-		if (verticalSpacing != null)
-		{
-			if (spaceFromBounds)
-			{
-				prevHeight = objects[0].height;
-			}
-			runningY = startY;
-		}
-		else
-		{
-			runningY = objects[0].y;
-		}
-
-		if (position != null)
-		{
-			position(objects[0], runningX, runningY);
-		}
-		else
-		{
-			objects[0].x = runningX;
-			objects[0].y = runningY;
-		}
-
-		var curX:Float = 0;
-		var curY:Float = 0;
-
-		for (i in 1...objects.length)
+		var prevWidth:Int = 0;
+		var prevHeight:Int = 0;
+		
+		for (i in 0...(objects.length))
 		{
 			var object = objects[i];
-
-			if (horizontalSpacing != null)
-			{
-				curX = runningX + prevWidth + horizontalSpacing;
-				runningX = curX;
-			}
-			else
-			{
-				curX = object.x;
-			}
-
-			if (verticalSpacing != null)
-			{
-				curY = runningY + prevHeight + verticalSpacing;
-				runningY = curY;
-			}
-			else
-			{
-				curY = object.y;
-			}
-
-			if (position != null)
-			{
-				position(object, curX, curY);
-			}
-			else
-			{
-				object.x = curX;
-				object.y = curY;
-			}
-
+			
 			if (spaceFromBounds)
 			{
-				prevWidth = object.width;
-				prevHeight = object.height;
+				object.x = startX + prevWidth + (i * horizontalSpacing);
+				object.y = startY + prevHeight + (i * verticalSpacing);
+			}
+			else
+			{
+				object.x = startX + (i * horizontalSpacing);
+				object.y = startY + (i * verticalSpacing);
 			}
 		}
 	}
-
+	
+	/**
+	 * Centers the given FlxObject on the screen, either by the x axis, y axis, or both
+	 * 
+	 * @param	object			The FlxSprite to center
+	 * @param	Horizontally	Boolean true if you want it centered horizontally
+	 * @param	Vertically		Boolean	true if you want it centered vertically
+	 * @return 	The FlxObject for chaining
+	 */
+	public static function screenCenter(object:FlxObject, xAxis:Bool = true, yAxis:Bool = true):FlxObject
+	{
+		if (xAxis)
+		{
+			object.x = (FlxG.width / 2) - (object.width / 2);
+		}
+		
+		if (yAxis)
+		{
+			object.y = (FlxG.height / 2) - (object.height / 2);
+		}
+		
+		return object;
+	}
+	
 	/**
 	 * This function draws a line on a FlxSprite from position X1,Y1
 	 * to position X2,Y2 with the specified color.
-	 *
+	 * 
 	 * @param	sprite		The FlxSprite to manipulate
 	 * @param	StartX		X coordinate of the line's start point.
 	 * @param	StartY		Y coordinate of the line's start point.
 	 * @param	EndX		X coordinate of the line's end point.
 	 * @param	EndY		Y coordinate of the line's end point.
 	 * @param	lineStyle	A LineStyle typedef containing the params of Graphics.lineStyle()
-	 * @param	drawStyle	A DrawStyle typedef containing the params of BitmapData.draw()
+	 * @param	drawStyle	A DrawStyle typdef containing the params of BitmapData.draw()
 	 * @return 	The FlxSprite for chaining
 	 */
-	public static function drawLine(sprite:FlxSprite, StartX:Float, StartY:Float, EndX:Float, EndY:Float, ?lineStyle:LineStyle, ?drawStyle:DrawStyle):FlxSprite
+	public static function drawLine(sprite:FlxSprite, StartX:Float, StartY:Float, EndX:Float, EndY:Float, 
+		?lineStyle:LineStyle, ?drawStyle:DrawStyle):FlxSprite
 	{
-		lineStyle = getDefaultLineStyle(lineStyle);
-		beginDraw(0x0, lineStyle);
+		if (lineStyle == null)
+			lineStyle = { thickness: 1, color: FlxColor.WHITE };
+		if (lineStyle.thickness == null)
+			lineStyle.thickness = 1;
+		if (lineStyle.color == null)
+			lineStyle.color = FlxColor.WHITE;
+		
+		beginDraw(0, lineStyle);
 		flashGfx.moveTo(StartX, StartY);
 		flashGfx.lineTo(EndX, EndY);
 		endDraw(sprite, drawStyle);
 		return sprite;
 	}
-
-	/**
-	 * This function draws a curve on a FlxSprite from position X1,Y1
-	 * to anchor position X2,Y2 using control points X3,Y3 with the specified color.
-	 *
-	 * @param	sprite		The FlxSprite to manipulate
-	 * @param	StartX		X coordinate of the curve's start point.
-	 * @param	StartY		Y coordinate of the curve's start point.
-	 * @param	EndX		X coordinate of the curve's end/anchor point.
-	 * @param	EndY		Y coordinate of the curve's end/anchor point.
-	 * @param	ControlX	X coordinate of the curve's control point.
-	 * @param	ControlY	Y coordinate of the curve's control point.
-	 * @param	FillColor		The ARGB color to fill this curve with. FlxColor.TRANSPARENT (0x0) means no fill. Filling a curve draws a line from End to Start to complete the figure.
-	 * @param	lineStyle	A LineStyle typedef containing the params of Graphics.lineStyle()
-	 * @param	drawStyle	A DrawStyle typedef containing the params of BitmapData.draw()
-	 * @return 	The FlxSprite for chaining
-	 */
-	public static function drawCurve(sprite:FlxSprite, StartX:Float, StartY:Float, EndX:Float, EndY:Float, ControlX:Float, ControlY:Float,
-			FillColor:FlxColor = FlxColor.TRANSPARENT, ?lineStyle:LineStyle, ?drawStyle:DrawStyle):FlxSprite
-	{
-		lineStyle = getDefaultLineStyle(lineStyle);
-		beginDraw(FillColor, lineStyle);
-		flashGfx.moveTo(StartX, StartY);
-		flashGfx.curveTo(EndX, EndY, ControlX, ControlY);
-		endDraw(sprite, drawStyle);
-		return sprite;
-	}
-
+	
 	/**
 	 * This function draws a rectangle on a FlxSprite.
-	 *
+	 * 
 	 * @param	sprite		The FlxSprite to manipulate
 	 * @param	X			X coordinate of the rectangle's start point.
 	 * @param	Y			Y coordinate of the rectangle's start point.
 	 * @param	Width		Width of the rectangle
 	 * @param	Height		Height of the rectangle
-	 * @param	FillColor		The ARGB color to fill this rectangle with. FlxColor.TRANSPARENT (0x0) means no fill.
+	 * @param	Color		The rectangle's color.
 	 * @param	lineStyle	A LineStyle typedef containing the params of Graphics.lineStyle()
-	 * @param	drawStyle	A DrawStyle typedef containing the params of BitmapData.draw()
+	 * @param	fillStyle	A FillStyle typedef containing the params of Graphics.fillStyle()
+	 * @param	drawStyle	A DrawStyle typdef containing the params of BitmapData.draw()
 	 * @return 	The FlxSprite for chaining
 	 */
-	public static function drawRect(sprite:FlxSprite, X:Float, Y:Float, Width:Float, Height:Float, FillColor:FlxColor = FlxColor.WHITE, ?lineStyle:LineStyle,
-			?drawStyle:DrawStyle):FlxSprite
+	public static function drawRect(sprite:FlxSprite, X:Float, Y:Float, Width:Float, Height:Float, Color:FlxColor, 
+		?lineStyle:LineStyle, ?fillStyle:FillStyle, ?drawStyle:DrawStyle):FlxSprite
 	{
-		beginDraw(FillColor, lineStyle);
+		beginDraw(Color, lineStyle, fillStyle);
 		flashGfx.drawRect(X, Y, Width, Height);
 		endDraw(sprite, drawStyle);
 		return sprite;
 	}
-
+	
 	/**
 	 * This function draws a rounded rectangle on a FlxSprite.
-	 *
+	 * 
 	 * @param	sprite			The FlxSprite to manipulate
 	 * @param	X				X coordinate of the rectangle's start point.
 	 * @param	Y				Y coordinate of the rectangle's start point.
@@ -411,25 +296,26 @@ class FlxSpriteUtil
 	 * @param	Height			Height of the rectangle
 	 * @param	EllipseWidth	The width of the ellipse used to draw the rounded corners
 	 * @param	EllipseHeight	The height of the ellipse used to draw the rounded corners
-	 * @param	FillColor			The ARGB color to fill this rectangle with. FlxColor.TRANSPARENT (0x0) means no fill.
+	 * @param	Color			The rectangle's color.
 	 * @param	lineStyle		A LineStyle typedef containing the params of Graphics.lineStyle()
-	 * @param	drawStyle		A DrawStyle typedef containing the params of BitmapData.draw()
+	 * @param	fillStyle		A FillStyle typedef containing the params of Graphics.fillStyle()
+	 * @param	drawStyle		A DrawStyle typdef containing the params of BitmapData.draw()
 	 * @return 	The FlxSprite for chaining
 	 */
-	public static function drawRoundRect(sprite:FlxSprite, X:Float, Y:Float, Width:Float, Height:Float, EllipseWidth:Float, EllipseHeight:Float,
-			FillColor:FlxColor = FlxColor.WHITE, ?lineStyle:LineStyle, ?drawStyle:DrawStyle):FlxSprite
+	public static function drawRoundRect(sprite:FlxSprite, X:Float, Y:Float, Width:Float, Height:Float, EllipseWidth:Float,
+		EllipseHeight:Float, Color:FlxColor, ?lineStyle:LineStyle, ?fillStyle:FillStyle, ?drawStyle:DrawStyle):FlxSprite
 	{
-		beginDraw(FillColor, lineStyle);
+		beginDraw(Color, lineStyle, fillStyle);
 		flashGfx.drawRoundRect(X, Y, Width, Height, EllipseWidth, EllipseHeight);
 		endDraw(sprite, drawStyle);
 		return sprite;
 	}
-
-	#if (flash || openfl >= "8.0.0")
+	
+	#if flash
 	/**
 	 * This function draws a rounded rectangle on a FlxSprite. Same as drawRoundRect,
 	 * except it allows you to determine the radius of each corner individually.
-	 *
+	 * 
 	 * @param	sprite				The FlxSprite to manipulate
 	 * @param	X					X coordinate of the rectangle's start point.
 	 * @param	Y					Y coordinate of the rectangle's start point.
@@ -439,98 +325,104 @@ class FlxSpriteUtil
 	 * @param	TopRightRadius		The radius of the top right corner of the rectangle
 	 * @param	BottomLeftRadius	The radius of the bottom left corner of the rectangle
 	 * @param	BottomRightRadius	The radius of the bottom right corner of the rectangle
-	 * @param	FillColor				The ARGB color to fill this rectangle with. FlxColor.TRANSPARENT (0x0) means no fill.
+	 * @param	Color				The rectangle's color.
 	 * @param	lineStyle			A LineStyle typedef containing the params of Graphics.lineStyle()
-	 * @param	drawStyle			A DrawStyle typedef containing the params of BitmapData.draw()
+	 * @param	fillStyle			A FillStyle typedef containing the params of Graphics.fillStyle()
+	 * @param	drawStyle			A DrawStyle typdef containing the params of BitmapData.draw()
 	 * @return 	The FlxSprite for chaining
 	 */
-	public static function drawRoundRectComplex(sprite:FlxSprite, X:Float, Y:Float, Width:Float, Height:Float, TopLeftRadius:Float, TopRightRadius:Float,
-			BottomLeftRadius:Float, BottomRightRadius:Float, FillColor:FlxColor = FlxColor.WHITE, ?lineStyle:LineStyle, ?drawStyle:DrawStyle):FlxSprite
+	public static function drawRoundRectComplex(sprite:FlxSprite, X:Float, Y:Float, Width:Float, Height:Float, 
+		TopLeftRadius:Float, TopRightRadius:Float, BottomLeftRadius:Float, BottomRightRadius:Float, Color:FlxColor, 
+		?lineStyle:LineStyle, ?fillStyle:FillStyle, ?drawStyle:DrawStyle):FlxSprite
 	{
-		beginDraw(FillColor, lineStyle);
+		beginDraw(Color, lineStyle, fillStyle);
 		flashGfx.drawRoundRectComplex(X, Y, Width, Height, TopLeftRadius, TopRightRadius, BottomLeftRadius, BottomRightRadius);
 		endDraw(sprite, drawStyle);
 		return sprite;
 	}
 	#end
-
+	
 	/**
 	 * This function draws a circle on a FlxSprite at position X,Y with the specified color.
-	 *
+	 * 
 	 * @param	sprite		The FlxSprite to manipulate
 	 * @param	X 			X coordinate of the circle's center (automatically centered on the sprite if -1)
 	 * @param	Y 			Y coordinate of the circle's center (automatically centered on the sprite if -1)
 	 * @param	Radius 		Radius of the circle (makes sure the circle fully fits on the sprite's graphic if < 1, assuming and and y are centered)
-	 * @param	FillColor 		The ARGB color to fill this circle with. FlxColor.TRANSPARENT (0x0) means no fill.
+	 * @param	Color 		Color of the circle
 	 * @param	lineStyle	A LineStyle typedef containing the params of Graphics.lineStyle()
-	 * @param	drawStyle	A DrawStyle typedef containing the params of BitmapData.draw()
+	 * @param	fillStyle	A FillStyle typedef containing the params of Graphics.fillStyle()
+	 * @param	drawStyle	A DrawStyle typdef containing the params of BitmapData.draw()
 	 * @return 	The FlxSprite for chaining
 	 */
-	public static function drawCircle(sprite:FlxSprite, X:Float = -1, Y:Float = -1, Radius:Float = -1, FillColor:FlxColor = FlxColor.WHITE,
-			?lineStyle:LineStyle, ?drawStyle:DrawStyle):FlxSprite
+	public static function drawCircle(sprite:FlxSprite, X:Float = - 1, Y:Float = - 1, Radius:Float = -1, 
+		Color:FlxColor = FlxColor.WHITE, ?lineStyle:LineStyle, ?fillStyle:FillStyle, ?drawStyle:DrawStyle):FlxSprite
 	{
-		if (X == -1 || Y == -1)
+		
+		if ((X == -1) || (Y == -1)) 
 		{
 			var midPoint = sprite.getGraphicMidpoint();
-
+			
 			if (X == -1)
-				X = midPoint.x - sprite.x;
+				X = midPoint.x;
 			if (Y == -1)
-				Y = midPoint.y - sprite.y;
-
+				Y = midPoint.y;
+			
 			midPoint.put();
 		}
-
-		if (Radius < 1)
+		
+		if (Radius < 1) 
 		{
 			var minVal = Math.min(sprite.frameWidth, sprite.frameHeight);
 			Radius = (minVal / 2);
 		}
-
-		beginDraw(FillColor, lineStyle);
+		
+		beginDraw(Color, lineStyle, fillStyle);
 		flashGfx.drawCircle(X, Y, Radius);
 		endDraw(sprite, drawStyle);
 		return sprite;
 	}
-
+	
 	/**
 	 * This function draws an ellipse on a FlxSprite.
-	 *
+	 * 
 	 * @param	sprite		The FlxSprite to manipulate
 	 * @param	X			X coordinate of the ellipse's start point.
 	 * @param	Y			Y coordinate of the ellipse's start point.
 	 * @param	Width		Width of the ellipse
 	 * @param	Height		Height of the ellipse
-	 * @param	FillColor		The ARGB color to fill this ellipse with. FlxColor.TRANSPARENT (0x0) means no fill.
+	 * @param	Color		The ellipse's color.
 	 * @param	lineStyle	A LineStyle typedef containing the params of Graphics.lineStyle()
-	 * @param	drawStyle	A DrawStyle typedef containing the params of BitmapData.draw()
+	 * @param	fillStyle	A FillStyle typedef containing the params of Graphics.fillStyle()
+	 * @param	drawStyle	A DrawStyle typdef containing the params of BitmapData.draw()
 	 * @return 	The FlxSprite for chaining
 	 */
-	public static function drawEllipse(sprite:FlxSprite, X:Float, Y:Float, Width:Float, Height:Float, FillColor:FlxColor = FlxColor.WHITE,
-			?lineStyle:LineStyle, ?drawStyle:DrawStyle):FlxSprite
+	public static function drawEllipse(sprite:FlxSprite, X:Float, Y:Float, Width:Float, Height:Float, Color:FlxColor, 
+		?lineStyle:LineStyle, ?fillStyle:FillStyle, ?drawStyle:DrawStyle):FlxSprite
 	{
-		beginDraw(FillColor, lineStyle);
+		beginDraw(Color, lineStyle, fillStyle);
 		flashGfx.drawEllipse(X, Y, Width, Height);
 		endDraw(sprite, drawStyle);
 		return sprite;
 	}
-
+	
 	/**
 	 * This function draws a simple, equilateral triangle on a FlxSprite.
-	 *
+	 * 
 	 * @param	sprite		The FlxSprite to manipulate
 	 * @param	X			X position of the triangle
 	 * @param	Y			Y position of the triangle
 	 * @param	Height		Height of the triangle
-	 * @param	FillColor		The ARGB color to fill this triangle with. FlxColor.TRANSPARENT (0x0) means no fill.
+	 * @param	Color		Color of the triangle
 	 * @param	lineStyle	A LineStyle typedef containing the params of Graphics.lineStyle()
-	 * @param	drawStyle	A DrawStyle typedef containing the params of BitmapData.draw()
+	 * @param	fillStyle	A FillStyle typedef containing the params of Graphics.fillStyle()
+	 * @param	drawStyle	A DrawStyle typdef containing the params of BitmapData.draw()
 	 * @return 	The FlxSprite for chaining
 	 */
-	public static function drawTriangle(sprite:FlxSprite, X:Float, Y:Float, Height:Float, FillColor:FlxColor = FlxColor.WHITE, ?lineStyle:LineStyle,
-			?drawStyle:DrawStyle):FlxSprite
+	public static function drawTriangle(sprite:FlxSprite, X:Float, Y:Float, Height:Float, Color:FlxColor, 
+		?lineStyle:LineStyle, ?fillStyle:FillStyle, ?drawStyle:DrawStyle):FlxSprite
 	{
-		beginDraw(FillColor, lineStyle);
+		beginDraw(Color, lineStyle, fillStyle);
 		flashGfx.moveTo(X + Height / 2, Y);
 		flashGfx.lineTo(X + Height, Height + Y);
 		flashGfx.lineTo(X, Height + Y);
@@ -538,21 +430,22 @@ class FlxSpriteUtil
 		endDraw(sprite, drawStyle);
 		return sprite;
 	}
-
+	
 	/**
 	 * This function draws a polygon on a FlxSprite.
-	 *
+	 * 
 	 * @param	sprite		The FlxSprite to manipulate
 	 * @param	Vertices	Array of Vertices to use for drawing the polygon
-	 * @param	FillColor		The ARGB color to fill this polygon with. FlxColor.TRANSPARENT (0x0) means no fill.
+	 * @param	Color		Color of the polygon
 	 * @param	lineStyle	A LineStyle typedef containing the params of Graphics.lineStyle()
-	 * @param	drawStyle	A DrawStyle typedef containing the params of BitmapData.draw()
+	 * @param	fillStyle	A FillStyle typedef containing the params of Graphics.fillStyle();
+	 * @param	drawStyle	A DrawStyle typdef containing the params of BitmapData.draw()
 	 * @return 	The FlxSprite for chaining
 	 */
-	public static function drawPolygon(sprite:FlxSprite, Vertices:Array<FlxPoint>, FillColor:FlxColor = FlxColor.WHITE, ?lineStyle:LineStyle,
-			?drawStyle:DrawStyle):FlxSprite
+	public static function drawPolygon(sprite:FlxSprite, Vertices:Array<FlxPoint>, Color:FlxColor, ?lineStyle:LineStyle, 
+		?fillStyle:FillStyle, ?drawStyle:DrawStyle):FlxSprite
 	{
-		beginDraw(FillColor, lineStyle);
+		beginDraw(Color, lineStyle, fillStyle);
 		var p:FlxPoint = Vertices.shift();
 		flashGfx.moveTo(p.x, p.y);
 		for (p in Vertices)
@@ -560,33 +453,36 @@ class FlxSpriteUtil
 			flashGfx.lineTo(p.x, p.y);
 		}
 		endDraw(sprite, drawStyle);
-		Vertices.unshift(p);
 		return sprite;
 	}
 
 	/**
 	 * Helper function that the drawing functions use at the start to set the color and lineStyle.
-	 *
-	 * @param	FillColor		The ARGB color to use for drawing
+	 * 
+	 * @param	Color		The color to use for drawing
 	 * @param	lineStyle	A LineStyle typedef containing the params of Graphics.lineStyle()
+	 * @param	fillStyle	A FillStyle typedef containing the params of Graphics.fillStyle()
 	 */
 	@:noUsing
-	public static inline function beginDraw(FillColor:FlxColor, ?lineStyle:LineStyle):Void
+	public static inline function beginDraw(Color:FlxColor, ?lineStyle:LineStyle, ?fillStyle:FillStyle):Void
 	{
 		flashGfx.clear();
 		setLineStyle(lineStyle);
-
-		if (FillColor != FlxColor.TRANSPARENT)
+		
+		if ((fillStyle != null) && (fillStyle.hasFill)) 
 		{
-			flashGfx.beginFill(FillColor.to24Bit(), FillColor.alphaFloat);
+			//use the fillStyle for color information
+			Color = fillStyle.color;
 		}
+		
+		flashGfx.beginFill(Color.to24Bit(), Color.alphaFloat);
 	}
-
+	
 	/**
 	 * Helper function that the drawing functions use at the end.
-	 *
+	 * 
 	 * @param	sprite		The FlxSprite to draw to
-	 * @param	drawStyle	A DrawStyle typedef containing the params of BitmapData.draw()
+	 * @param	drawStyle	A DrawStyle typdef containing the params of BitmapData.draw()
 	 * @return 	The FlxSprite for chaining
 	 */
 	public static inline function endDraw(sprite:FlxSprite, ?drawStyle:DrawStyle):FlxSprite
@@ -599,31 +495,33 @@ class FlxSpriteUtil
 	/**
 	 * Just a helper function that is called at the end of the draw functions
 	 * to handle a few things related to updating a sprite's graphic.
-	 *
+	 * 
 	 * @param	Sprite		The FlxSprite to manipulate
-	 * @param	drawStyle	A DrawStyle typedef containing the params of BitmapData.draw()
+	 * @param	drawStyle	A DrawStyle typdef containing the params of BitmapData.draw()
 	 * @return 	The FlxSprite for chaining
 	 */
 	public static function updateSpriteGraphic(sprite:FlxSprite, ?drawStyle:DrawStyle):FlxSprite
 	{
-		if (drawStyle == null)
+		if (drawStyle == null) 
 		{
-			drawStyle = {smoothing: false};
+			drawStyle = { smoothing: false };
 		}
 		else if (drawStyle.smoothing == null)
 		{
 			drawStyle.smoothing = false;
 		}
-
-		sprite.pixels.draw(flashGfxSprite, drawStyle.matrix, drawStyle.colorTransform, drawStyle.blendMode, drawStyle.clipRect, drawStyle.smoothing);
+		
+		sprite.pixels.draw(flashGfxSprite, drawStyle.matrix, drawStyle.colorTransform, 
+			drawStyle.blendMode, drawStyle.clipRect, drawStyle.smoothing);
 		sprite.dirty = true;
+		sprite.resetFrameBitmapDatas();
 		return sprite;
 	}
-
+	
 	/**
 	 * Just a helper function that is called in the draw functions
 	 * to set the lineStyle via Graphics.lineStyle()
-	 *
+	 * 
 	 * @param	lineStyle	The lineStyle typedef
 	 */
 	@:noUsing
@@ -631,87 +529,84 @@ class FlxSpriteUtil
 	{
 		if (lineStyle != null)
 		{
-			var color = (lineStyle.color == null) ? FlxColor.BLACK : lineStyle.color;
-
-			if (lineStyle.thickness == null)
-				lineStyle.thickness = 1;
-			if (lineStyle.pixelHinting == null)
-				lineStyle.pixelHinting = false;
-			if (lineStyle.miterLimit == null)
-				lineStyle.miterLimit = 3;
-
-			flashGfx.lineStyle(lineStyle.thickness, color.to24Bit(), color.alphaFloat, lineStyle.pixelHinting, lineStyle.scaleMode, lineStyle.capsStyle,
-				lineStyle.jointStyle, lineStyle.miterLimit);
+			var color:FlxColor;
+			
+			if (lineStyle.color == null) 
+			{ 
+				color = FlxColor.BLACK;
+			}
+			else 
+			{
+				color = lineStyle.color;
+			}
+			
+			if (lineStyle.pixelHinting == null) { lineStyle.pixelHinting = false; }
+			if (lineStyle.miterLimit == null) 	{ lineStyle.miterLimit = 3; }
+			
+			flashGfx.lineStyle(
+				lineStyle.thickness,
+				color.to24Bit(), 
+				color.alphaFloat,
+				lineStyle.pixelHinting,
+				lineStyle.scaleMode,
+				lineStyle.capsStyle,
+				lineStyle.jointStyle,
+				lineStyle.miterLimit);
 		}
 	}
-
-	/**
-	 * Helper function for the default line styles of drawLine() and drawCurve()
-	 *
-	 * @param   lineStyle   The lineStyle typedef
-	 */
-	public static inline function getDefaultLineStyle(?lineStyle:LineStyle):LineStyle
-	{
-		if (lineStyle == null)
-			lineStyle = {thickness: 1, color: FlxColor.WHITE};
-		if (lineStyle.thickness == null)
-			lineStyle.thickness = 1;
-		if (lineStyle.color == null)
-			lineStyle.color = FlxColor.WHITE;
-
-		return lineStyle;
-	}
-
+	
 	/**
 	 * Fills this sprite's graphic with a specific color.
-	 *
+	 * 
 	 * @param	Sprite	The FlxSprite to manipulate
-	 * @param	FillColor	The color with which to fill the graphic, format 0xAARRGGBB.
+	 * @param	Color	The color with which to fill the graphic, format 0xAARRGGBB.
 	 * @return 	The FlxSprite for chaining
 	 */
-	public static function fill(sprite:FlxSprite, FillColor:FlxColor):FlxSprite
+	public static function fill(sprite:FlxSprite, Color:FlxColor):FlxSprite
 	{
-		sprite.pixels.fillRect(sprite.pixels.rect, FillColor);
-
+		sprite.pixels.fillRect(sprite.pixels.rect, Color);
+		
 		if (sprite.pixels != sprite.framePixels)
 		{
 			sprite.dirty = true;
 		}
-
+		
+		sprite.resetFrameBitmapDatas();
 		return sprite;
 	}
-
+	
 	/**
 	 * A simple flicker effect for sprites achieved by toggling visibility.
-	 *
+	 * 
 	 * @param	Object				The sprite.
-	 * @param	Duration			How long to flicker for (in seconds). `0` means "forever".
-	 * @param	Interval			In what interval to toggle visibility. Set to `FlxG.elapsed` if `<= 0`!
+	 * @param	Duration			How long to flicker for. 0 means "forever".
+	 * @param	Interval			In what interval to toggle visibility. Set to FlxG.elapsed if <= 0!
 	 * @param	EndVisibility		Force the visible value when the flicker completes, useful with fast repetitive use.
-	 * @param	ForceRestart		Force the flicker to restart from beginning, discarding the flickering effect already in progress if there is one.
+	 * @param	ForceRestart		Force the flicker to restart from beginnig, discarding the flickering effect already in progress if there is one.
 	 * @param	CompletionCallback	An optional callback that will be triggered when a flickering has finished.
 	 * @param	ProgressCallback	An optional callback that will be triggered when visibility is toggled.
-	 * @return The FlxFlicker object. FlxFlickers are pooled internally, so beware of storing references.
+	 * @return	The FlxObject for chaining
 	 */
-	public static inline function flicker(Object:FlxObject, Duration:Float = 1, Interval:Float = 0.04, EndVisibility:Bool = true, ForceRestart:Bool = true,
-			?CompletionCallback:FlxFlicker->Void, ?ProgressCallback:FlxFlicker->Void):FlxFlicker
+	public static inline function flicker(Object:FlxObject, Duration:Float = 1, Interval:Float = 0.04, EndVisibility:Bool = true, 
+		ForceRestart:Bool = true, ?CompletionCallback:FlxFlicker->Void, ?ProgressCallback:FlxFlicker->Void):FlxObject
 	{
-		return FlxFlicker.flicker(Object, Duration, Interval, EndVisibility, ForceRestart, CompletionCallback, ProgressCallback);
+		FlxFlicker.flicker(Object, Duration, Interval, EndVisibility, ForceRestart, CompletionCallback, ProgressCallback);
+		return Object;
 	}
-
+	
 	/**
 	 * Returns whether an object is flickering or not.
-	 *
+	 * 
 	 * @param  Object 	The object to check against.
 	 */
 	public static inline function isFlickering(Object:FlxObject):Bool
 	{
 		return FlxFlicker.isFlickering(Object);
 	}
-
+	
 	/**
 	 * Stops flickering of the object. Also it will make the object visible.
-	 *
+	 * 
 	 * @param  Object 	The object to stop flickering.
 	 * @return The FlxObject for chaining
 	 */
@@ -720,110 +615,44 @@ class FlxSpriteUtil
 		FlxFlicker.stopFlickering(Object);
 		return Object;
 	}
-
+	
 	/**
 	 * Fade in a sprite, tweening alpha to 1.
-	 *
+	 * 
 	 * @param  sprite 	The object to fade.
 	 * @param  Duration How long the fade will take (in seconds).
 	 * @return The FlxSprite for chaining
 	 */
-	public static inline function fadeIn(sprite:FlxSprite, Duration:Float = 1, ?ResetAlpha:Bool, ?OnComplete:TweenCallback):FlxSprite
+	public static inline function fadeIn(sprite:FlxSprite, Duration:Float = 1, ?ResetAlpha:Bool, ?OnComplete:CompleteCallback):FlxSprite
 	{
-		if (ResetAlpha)
+		if (ResetAlpha) 
 		{
 			sprite.alpha = 0;
 		}
-		FlxTween.num(sprite.alpha, 1, Duration, {onComplete: OnComplete}, alphaTween.bind(sprite));
+		FlxTween.num(sprite.alpha, 1, Duration, OnComplete != null ? { complete:OnComplete } : null, alphaTween.bind(sprite));
 		return sprite;
 	}
-
+	
 	/**
 	 * Fade out a sprite, tweening alpha to 0.
-	 *
+	 * 
 	 * @param  sprite 	The object to fade.
 	 * @param  Duration How long the fade will take (in seconds).
 	 * @return The FlxSprite for chaining
 	 */
-	public static inline function fadeOut(sprite:FlxSprite, Duration:Float = 1, ?OnComplete:TweenCallback):FlxSprite
+	public static inline function fadeOut(sprite:FlxSprite, Duration:Float = 1, ?OnComplete:CompleteCallback):FlxSprite
 	{
-		FlxTween.num(sprite.alpha, 0, Duration, {onComplete: OnComplete}, alphaTween.bind(sprite));
+		FlxTween.num(sprite.alpha, 0, Duration, OnComplete != null ? { complete:OnComplete } : null, alphaTween.bind(sprite));
 		return sprite;
 	}
-
-	static function alphaTween(sprite:FlxSprite, f:Float):Void
+	
+	private static function alphaTween(sprite:FlxSprite, f:Float):Void
 	{
 		sprite.alpha = f;
 	}
-	
-	/**
-	 * Change's this sprite's color transform to apply a tint effect.
-	 * Mimics Adobe Animate's "Tint" color effect
-	 * 
-	 * @param   tint  The color to tint the sprite, where alpha determines the strength
-	 * 
-	 * @since 5.4.0
-	 */
-	public static inline function setTint(sprite:FlxSprite, tint:FlxColor)
-	{
-		final strength = tint.alphaFloat;
-		inline function scaleInt(i:Int):Int
-		{
-			return Math.round(i * strength);
-		}
-		
-		final mult = 1 - strength;
-		sprite.setColorTransform(mult, mult, mult, 1.0, scaleInt(tint.red), scaleInt(tint.green), scaleInt(tint.blue));
-	}
-	
-	/**
-	 * Uses `FlxTween.num` to call `setTint` on the target sprite
-	 * 
-	 * @param   tint        The color to tint the sprite, where alpha determines the max strength
-	 * @param   duration    How long the flash lasts
-	 * @param   func        Controls the amount of tint over time. The input float goes from 0 to
-	 *                      1.0, an output of 1.0 means the tint is fully applied. If omitted,
-	 *                      `(n)->1-n` is used, meaning it starts at full tint and fades away
-	 * @param   onComplete  Called when the flash is complete
-	 * 
-	 * @since 5.4.0
-	 */
-	public static inline function flashTint(sprite:FlxSprite, tint = FlxColor.WHITE, duration = 0.5,
-		?func:(Float)->Float, ?onComplete:()->Void)
-	{
-		final options:TweenOptions = onComplete != null ? { onComplete: (_)->onComplete} : null;
-		if (func == null)
-			func = (n)->1-FlxEase.circIn(n);// start at full, fade out
-		
-		var color = tint.rgb;
-		final strength = tint.alphaFloat;
-		FlxTween.num(0, 1, duration, options, function(n)
-		{
-			color.alphaFloat = strength * func(n);
-			setTint(sprite, color);
-		});
-		
-		return sprite;
-	}
-	
-	/**
-	 * Change's this sprite's color transform to brighten or darken it.
-	 * Mimics Adobe Animate's "Brightness" color effect
-	 * 
-	 * @param   brightness  Use 1.0 to fully brighten, -1.0 to fully darken, or anything inbetween
-	 * 
-	 * @since 5.4.0
-	 */
-	public static inline function setBrightness(sprite:FlxSprite, brightness:Float)
-	{
-		final mult = 1.0 - Math.abs(brightness);
-		final offset = Math.round(Math.max(0, 0xFF * brightness));
-		sprite.setColorTransform(mult, mult, mult, 1.0, offset, offset, offset);
-	}
 }
 
-typedef LineStyle =
-{
+typedef LineStyle = {
 	?thickness:Float,
 	?color:FlxColor,
 	?pixelHinting:Bool,
@@ -833,8 +662,13 @@ typedef LineStyle =
 	?miterLimit:Float
 }
 
-typedef DrawStyle =
-{
+typedef FillStyle = {
+	?hasFill:Bool,
+	?color:FlxColor,
+	?alpha:Float
+}
+
+typedef DrawStyle = {
 	?matrix:Matrix,
 	?colorTransform:ColorTransform,
 	?blendMode:BlendMode,
