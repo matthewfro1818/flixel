@@ -4,7 +4,7 @@ import flixel.graphics.shaders.FlxShader;
 import flixel.system.render.common.FlxShaderData;
 import flixel.system.render.gl.GLUtils;
 import flixel.util.FlxDestroyUtil.IFlxDestroyable;
-import lime.graphics.GLRenderContext;
+import openfl.display.GLRenderContext;
 import lime.graphics.opengl.GLProgram;
 import lime.utils.Float32Array;
 import openfl.display.BitmapData;
