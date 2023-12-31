@@ -1,7 +1,6 @@
 package flixel.input;
-import flixel.util.FlxDestroyUtil.IFlxDestroyable;
 
-class FlxInput<T>
+class FlxInput<T> implements IFlxInput
 {
 	public var ID:T;
 	
@@ -52,16 +51,12 @@ class FlxInput<T>
 	
 	public function hasState(state:FlxInputState):Bool
 	{
-		switch (state)
+		return switch (state)
 		{
-			case JUST_RELEASED:
-				return justReleased;
-			case RELEASED:
-				return released;
-			case PRESSED:
-				return pressed;
-			case JUST_PRESSED:
-				return justPressed;
+			case JUST_RELEASED: justReleased;
+			case RELEASED:      released;
+			case PRESSED:       pressed;
+			case JUST_PRESSED:  justPressed;
 		}
 	}
 	

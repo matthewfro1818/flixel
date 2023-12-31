@@ -6,25 +6,23 @@ import flixel.input.gamepad.id.PS4ID;
 class PS4Mapping extends FlxGamepadMapping
 {
 	#if FLX_JOYSTICK_API
-	static inline var LEFT_ANALOG_STICK_FAKE_X:Int = 21;
-	static inline var LEFT_ANALOG_STICK_FAKE_Y:Int = 22;
+	private static inline var LEFT_ANALOG_STICK_FAKE_X:Int = 21;
+	private static inline var LEFT_ANALOG_STICK_FAKE_Y:Int = 22;
 
-	static inline var RIGHT_ANALOG_STICK_FAKE_X:Int = 23;
-	static inline var RIGHT_ANALOG_STICK_FAKE_Y:Int = 24;
+	private static inline var RIGHT_ANALOG_STICK_FAKE_X:Int = 23;
+	private static inline var RIGHT_ANALOG_STICK_FAKE_Y:Int = 24;
 
-	static inline var LEFT_TRIGGER_FAKE:Int = 25;
-	static inline var RIGHT_TRIGGER_FAKE:Int = 26;
+	private static inline var LEFT_TRIGGER_FAKE:Int = 25;
+	private static inline var RIGHT_TRIGGER_FAKE:Int = 26;
 	#end
-
-	override function initValues():Void
+	
+	override function initValues():Void 
 	{
 		leftStick = PS4ID.LEFT_ANALOG_STICK;
 		rightStick = PS4ID.RIGHT_ANALOG_STICK;
-		supportsMotion = true;
-		supportsPointer = true;
 	}
-
-	override public function getID(rawID:Int):FlxGamepadInputID
+	
+	override public function getID(rawID:Int):FlxGamepadInputID 
 	{
 		return switch (rawID)
 		{
@@ -32,11 +30,7 @@ class PS4Mapping extends FlxGamepadMapping
 			case PS4ID.CIRCLE: B;
 			case PS4ID.SQUARE: X;
 			case PS4ID.TRIANGLE: Y;
-			#if ps4
-			case PS4ID.TOUCHPAD_CLICK: BACK;
-			#else
 			case PS4ID.SHARE: BACK;
-			#end
 			case PS4ID.PS: GUIDE;
 			case PS4ID.OPTIONS: START;
 			case PS4ID.LEFT_STICK_CLICK: LEFT_STICK_CLICK;
@@ -58,8 +52,8 @@ class PS4Mapping extends FlxGamepadMapping
 			case _: NONE;
 		}
 	}
-
-	override public function getRawID(ID:FlxGamepadInputID):Int
+	
+	override public function getRawID(ID:FlxGamepadInputID):Int 
 	{
 		return switch (ID)
 		{
@@ -67,11 +61,7 @@ class PS4Mapping extends FlxGamepadMapping
 			case B: PS4ID.CIRCLE;
 			case X: PS4ID.SQUARE;
 			case Y: PS4ID.TRIANGLE;
-			#if ps4
-			case BACK: PS4ID.TOUCHPAD_CLICK;
-			#else
 			case BACK: PS4ID.SHARE;
-			#end
 			case GUIDE: PS4ID.PS;
 			case START: PS4ID.OPTIONS;
 			case LEFT_STICK_CLICK: PS4ID.LEFT_STICK_CLICK;
@@ -100,39 +90,17 @@ class PS4Mapping extends FlxGamepadMapping
 		}
 	}
 	
-	override function getInputLabel(id:FlxGamepadInputID)
-	{
-		return switch (id)
-		{
-			case A: "x";
-			case B: "circle";
-			case X: "square";
-			case Y: "triangle";
-			case BACK: "share";
-			case GUIDE: "ps";
-			case START: "options";
-			case LEFT_SHOULDER: "l1";
-			case RIGHT_SHOULDER: "r1";
-			case LEFT_TRIGGER: "l2";
-			case RIGHT_TRIGGER: "r2";
-			case _: super.getInputLabel(id);
-		}
-	}
-	
 	#if FLX_JOYSTICK_API
-	override public function axisIndexToRawID(axisID:Int):Int
+	override public function axisIndexToRawID(axisID:Int):Int 
 	{
-		// Analog stick and trigger values overlap with regular buttons so we remap to "fake" button ID's
-		return if (axisID == leftStick.x) LEFT_ANALOG_STICK_FAKE_X; else if (axisID == leftStick.y) LEFT_ANALOG_STICK_FAKE_Y; else if (axisID == rightStick.x)
-			RIGHT_ANALOG_STICK_FAKE_X;
-		else if (axisID == rightStick.y)
-			RIGHT_ANALOG_STICK_FAKE_Y;
-		else if (axisID == PS4ID.L2)
-			LEFT_TRIGGER_FAKE;
-		else if (axisID == PS4ID.R2)
-			RIGHT_TRIGGER_FAKE;
-		else
-			axisID;
+		//Analog stick and trigger values overlap with regular buttons so we remap to "fake" button ID's
+		return if (axisID == leftStick.x) LEFT_ANALOG_STICK_FAKE_X;
+			else if (axisID == leftStick.y) LEFT_ANALOG_STICK_FAKE_Y;
+			else if (axisID == rightStick.x) RIGHT_ANALOG_STICK_FAKE_X;
+			else if (axisID == rightStick.y) RIGHT_ANALOG_STICK_FAKE_Y;
+			else if (axisID == PS4ID.L2) LEFT_TRIGGER_FAKE;
+			else if (axisID == PS4ID.R2) RIGHT_TRIGGER_FAKE;
+			else axisID;
 	}
 	#end
 }

@@ -1,10 +1,6 @@
 package flixel.input;
 
 import flixel.FlxG;
-import flixel.system.debug.FlxDebugger;
-import flixel.system.FlxAssets;
-import flixel.system.frontEnds.PluginFrontEnd;
-import flixel.math.FlxAngle;
 import flixel.math.FlxMath;
 import flixel.math.FlxPoint;
 import flixel.util.FlxStringUtil;
@@ -46,7 +42,7 @@ class FlxSwipe
 			LabelValuePair.weak("end", endPosition),
 			LabelValuePair.weak("distance", distance),
 			LabelValuePair.weak("angle", angle),
-			LabelValuePair.weak("duration", (duration / 1000))]);
+			LabelValuePair.weak("duration", duration)]);
 	}
 	
 	private inline function get_distance():Float
@@ -61,6 +57,6 @@ class FlxSwipe
 	
 	private inline function get_duration():Float
 	{
-		return (_endTimeInTicks - _startTimeInTicks);
+		return (_endTimeInTicks - _startTimeInTicks) / 1000;
 	}
 }

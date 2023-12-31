@@ -1,11 +1,10 @@
 package flixel.input.touch;
 
-#if !FLX_NO_TOUCH
-import openfl.events.TouchEvent;
-import openfl.Lib;
-import openfl.ui.Multitouch;
-import openfl.ui.MultitouchInputMode;
-import flixel.FlxG;
+#if FLX_TOUCH
+import flash.events.TouchEvent;
+import flash.Lib;
+import flash.ui.Multitouch;
+import flash.ui.MultitouchInputMode;
 
 /**
  * ...
