@@ -1,15 +1,16 @@
 package flixel.util;
 
-import openfl.display.BitmapData;
-import openfl.geom.Matrix;
-import openfl.geom.Point;
-import openfl.geom.Rectangle;
+import flash.display.BitmapData;
+import flash.geom.Rectangle;
 import flixel.FlxCamera;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.group.FlxGroup;
 import flixel.math.FlxAngle;
 import flixel.math.FlxMath;
+import flixel.math.FlxRect;
+import flixel.math.FlxVector;
+import flixel.math.FlxMatrix;
 import flixel.tile.FlxTileblock;
 
 /**
@@ -21,15 +22,17 @@ import flixel.tile.FlxTileblock;
 class FlxCollision 
 {
 	// Optimization: Local static vars to reduce allocations
-	private static var pointA:Point = new Point();
-	private static var pointB:Point = new Point();
-	private static var centerA:Point = new Point();
-	private static var centerB:Point = new Point();
-	private static var matrixA:Matrix = new Matrix();
-	private static var matrixB:Matrix = new Matrix();
-	private static var testMatrix:Matrix = new Matrix();
-	private static var boundsA:Rectangle = new Rectangle();
-	private static var boundsB:Rectangle = new Rectangle();
+	private static var pointA:FlxVector = new FlxVector();
+	private static var pointB:FlxVector = new FlxVector();
+	private static var centerA:FlxVector = new FlxVector();
+	private static var centerB:FlxVector = new FlxVector();
+	private static var matrixA:FlxMatrix = new FlxMatrix();
+	private static var matrixB:FlxMatrix = new FlxMatrix();
+	private static var testMatrix:FlxMatrix = new FlxMatrix();
+	private static var boundsA:FlxRect = new FlxRect();
+	private static var boundsB:FlxRect = new FlxRect();
+	private static var intersect:FlxRect = new FlxRect();
+	private static var flashRect:Rectangle = new Rectangle();
 	
 	/**
 	 * A Pixel Perfect Collision check between two FlxSprites. It will do a bounds check first, and if that passes it will run a 
@@ -57,18 +60,20 @@ class FlxCollision
 		if (considerRotation)
 		{
 			// find the center of both sprites
-			Contact.origin.copyToFlash(centerA);
-			Target.origin.copyToFlash(centerB);			
+			Contact.origin.copyTo(centerA);
+			Target.origin.copyTo(centerB);
 			
 			// now make a bounding box that allows for the sprite to be rotated in 360 degrees
-			boundsA.x = (pointA.x + centerA.x - centerA.length);
-			boundsA.y = (pointA.y + centerA.y - centerA.length);
-			boundsA.width = centerA.length * 2;
+			var lengthA = centerA.length;
+			boundsA.x = (pointA.x + centerA.x - lengthA);
+			boundsA.y = (pointA.y + centerA.y - lengthA);
+			boundsA.width = lengthA * 2;
 			boundsA.height = boundsA.width;
 			
-			boundsB.x = (pointB.x + centerB.x - centerB.length);
-			boundsB.y = (pointB.y + centerB.y - centerB.length);
-			boundsB.width = centerB.length * 2;
+			var lengthB = centerB.length;
+			boundsB.x = (pointB.x + centerB.x - lengthB);
+			boundsB.y = (pointB.y + centerB.y - lengthB);
+			boundsB.width = lengthB * 2;
 			boundsB.height = boundsB.width;
 		}
 		else
@@ -84,9 +89,9 @@ class FlxCollision
 			boundsB.height = Target.frameHeight;
 		}
 		
-		var intersect:Rectangle = boundsA.intersection(boundsB);
+		boundsA.intersection(boundsB, intersect.set());
 		
-		if (intersect.isEmpty() || intersect.width < 1 || intersect.height < 1)
+		if (intersect.isEmpty || intersect.width < 1 || intersect.height < 1)
 		{
 			return false;
 		}
@@ -98,10 +103,8 @@ class FlxCollision
 		matrixB.identity();
 		matrixB.translate(-(intersect.x - boundsB.x), -(intersect.y - boundsB.y));
 		
-	#if FLX_RENDER_TILE
 		Contact.drawFrame();
 		Target.drawFrame();
-	#end
 		
 		var testA:BitmapData = Contact.framePixels;
 		var testB:BitmapData = Target.framePixels;
@@ -151,8 +154,11 @@ class FlxCollision
 		boundsB.width = overlapWidth;
 		boundsB.height = overlapHeight;
 		
-		var pixelsA = testA.getPixels(boundsA);
-		var pixelsB = testB.getPixels(boundsB);
+		boundsA.copyToFlash(flashRect);
+		var pixelsA = testA.getPixels(flashRect);
+		
+		boundsB.copyToFlash(flashRect);
+		var pixelsB = testB.getPixels(flashRect);
 		
 		var hit = false;
 		
@@ -216,33 +222,29 @@ class FlxCollision
 	public static function pixelPerfectPointCheck(PointX:Int, PointY:Int, Target:FlxSprite, AlphaTolerance:Int = 1):Bool
 	{
 		// Intersect check
-		if (FlxMath.pointInCoordinates(PointX, PointY, Math.floor(Target.x), Math.floor(Target.y), Std.int(Target.width), Std.int(Target.height)) == false)
+		if (!FlxMath.pointInCoordinates(PointX, PointY, Math.floor(Target.x),
+			Math.floor(Target.y), Std.int(Target.width), Std.int(Target.height)))
 		{
 			return false;
 		}
 		
-		#if FLX_RENDER_TILE
-		Target.drawFrame();
-		#end
+		if (FlxG.renderTile)
+		{
+			Target.drawFrame();
+		}
 		
 		// How deep is pointX/Y within the rect?
 		var test:BitmapData = Target.framePixels;
 		
 		var pixelAlpha = FlxColor.fromInt(test.getPixel32(Math.floor(PointX - Target.x), Math.floor(PointY - Target.y))).alpha;
 		
-		#if FLX_RENDER_TILE
-		pixelAlpha = Std.int(pixelAlpha * Target.alpha);
-		#end
+		if (FlxG.renderTile)
+		{
+			pixelAlpha = Std.int(pixelAlpha * Target.alpha);
+		}
 		
 		// How deep is pointX/Y within the rect?
-		if (pixelAlpha >= AlphaTolerance)
-		{
-			return true;
-		}
-		else
-		{
-			return false;
-		}
+		return pixelAlpha >= AlphaTolerance;
 	}
 	
 	/**

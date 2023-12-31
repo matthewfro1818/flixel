@@ -2,6 +2,15 @@ package flixel.tweens;
 
 /**
  * Static class with useful easer functions that can be used by Tweens.
+ * 
+ * Operation of in/out easers:
+ * 
+ * in(t)
+ * 	return t;
+ * out(t)
+ * 		return 1 - in(1 - t);
+ * inOut(t)
+ * 		return (t <= .5) ? in(t * 2) / 2 : out(t * 2 - 1) / 2 + .5;
  */
 class FlxEase 
 {
@@ -18,18 +27,7 @@ class FlxEase
 	private static var B6:Float = 2.625 / 2.75;
 	private static var ELASTIC_AMPLITUDE:Float = 1;
 	private static var ELASTIC_PERIOD:Float = 0.4;
-	
-	/**
-	 * Operation of in/out easers:
-	 * 
-	 * in(t)
-	 *		return t;
-	 * out(t)
-	 * 		return 1 - in(1 - t);
-	 * inOut(t)
-	 * 		return (t <= .5) ? in(t * 2) / 2 : out(t * 2 - 1) / 2 + .5;
-	 */
-	
+
 	public static inline function quadIn(t:Float):Float
 	{
 		return t * t;
@@ -67,7 +65,7 @@ class FlxEase
 	
 	public static inline function quartOut(t:Float):Float
 	{
-		return 1 - (t-=1) * t * t * t;
+		return 1 - (t -= 1) * t * t * t;
 	}
 	
 	public static inline function quartInOut(t:Float):Float
@@ -92,7 +90,7 @@ class FlxEase
 	
 	public static inline function sineIn(t:Float):Float
 	{
-		return - Math.cos(PI2 * t) + 1;
+		return -Math.cos(PI2 * t) + 1;
 	}
 	
 	public static inline function sineOut(t:Float):Float
@@ -183,7 +181,7 @@ class FlxEase
 	{
 		t *= 2;
 		if (t < 1) return t * t * (2.70158 * t - 1.70158) / 2;
-		t --;
+		t--;
 		return (1 - (--t) * (t) * (-2.70158 * t - 1.70158)) / 2 + .5;
 	}
 	
@@ -207,4 +205,4 @@ class FlxEase
 	}
 }
 
-typedef EaseFunction = Float -> Float;
+typedef EaseFunction = Float->Float;

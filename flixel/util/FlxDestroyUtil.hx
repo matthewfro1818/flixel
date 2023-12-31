@@ -1,9 +1,9 @@
 package flixel.util;
 
-import flixel.util.FlxPool;
-import openfl.display.BitmapData;
-import openfl.display.DisplayObject;
-import openfl.display.DisplayObjectContainer;
+import flash.display.BitmapData;
+import flash.display.DisplayObject;
+import flash.display.DisplayObjectContainer;
+import flixel.util.FlxPool.IFlxPooled;
 
 class FlxDestroyUtil
 {
@@ -32,7 +32,8 @@ class FlxDestroyUtil
 	{
 		if (array != null)
 		{
-			for (e in array) destroy(e);
+			for (e in array)
+				destroy(e);
 			array.splice(0, array.length);
 		}
 		return null;
@@ -64,7 +65,8 @@ class FlxDestroyUtil
 	{
 		if (array != null)
 		{
-			for (e in array) put(e);
+			for (e in array)
+				put(e);
 			array.splice(0, array.length);
 		}
 		return null;
@@ -74,7 +76,7 @@ class FlxDestroyUtil
 	/**
 	 * Checks if a BitmapData object is not null before calling dispose() on it, always returns null.
 	 * 
-	 * @param	Bitmap	A BitampData to be disposed if not null
+	 * @param	Bitmap	A BitmapData to be disposed if not null
 	 * @return 	null
 	 */
 	public static function dispose(bitmapData:BitmapData):BitmapData
@@ -83,6 +85,24 @@ class FlxDestroyUtil
 		{
 			bitmapData.dispose();
 		}
+		return null;
+	}
+	
+	/**
+	 * Checks if a BitmapData object is not null and it's size isn't equal to specified one before calling dispose() on it.
+	 */
+	public static function disposeIfNotEqual(bitmapData:BitmapData, width:Float, height:Float):BitmapData
+	{
+		if (bitmapData != null && (bitmapData.width != width || bitmapData.height != height))
+		{
+			bitmapData.dispose();
+			return null;
+		}
+		else if (bitmapData != null)
+		{
+			return bitmapData;
+		}
+		
 		return null;
 	}
 	

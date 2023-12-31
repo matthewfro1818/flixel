@@ -1,40 +1,54 @@
 package flixel.text;
 
-import openfl.display.BitmapData;
-import openfl.filters.BitmapFilter;
-import openfl.geom.ColorTransform;
-import openfl.text.TextField;
-import openfl.text.TextFieldAutoSize;
-import openfl.text.TextFormat;
-import openfl.text.TextFormatAlign;
+import flash.display.BitmapData;
+import flash.geom.ColorTransform;
+import flash.text.TextField;
+import flash.text.TextFieldAutoSize;
+import flash.text.TextFormat;
+import flash.text.TextFormatAlign;
 import flixel.FlxG;
 import flixel.FlxObject;
 import flixel.FlxSprite;
+import flixel.graphics.atlas.FlxAtlas;
+import flixel.graphics.atlas.FlxNode;
+import flixel.graphics.FlxGraphic;
+import flixel.graphics.frames.FlxFramesCollection;
+import flixel.math.FlxMath;
+import flixel.math.FlxPoint;
 import flixel.system.FlxAssets;
-import flixel.text.FlxText.FlxTextBorderStyle;
-import flixel.text.FlxText.FlxTextFormat;
-import flixel.util.FlxArrayUtil;
 import flixel.util.FlxColor;
 import flixel.util.FlxDestroyUtil;
-import flixel.math.FlxPoint;
-import flixel.util.loaders.CachedGraphics;
+import flixel.util.helpers.FlxRange;
 import openfl.Assets;
+import haxe.Utf8;
+using flixel.util.FlxStringUtil;
+
+#if flash
+import openfl.geom.Rectangle;
+#end
+
+// TODO: think about filters and text
 
 /**
  * Extends FlxSprite to support rendering text. Can tint, fade, rotate and scale just like a sprite. Doesn't really animate 
- * though, as far as I know. Also does nice pixel-perfect centering on pixel fonts as long as they are only one liners.
+ * though. Also does nice pixel-perfect centering on pixel fonts as long as they are only one-liners.
  */
 class FlxText extends FlxSprite
 {
 	/**
+	 * 2px gutter on both top and bottom
+	 */
+	private static inline var VERTICAL_GUTTER:Int = 4;
+
+	/**
 	 * The text being displayed.
 	 */
-	public var text(get, set):String;
+	public var text(default, set):String = "";
 	
 	/**
 	 * The size of the text being displayed in pixels.
 	 */
-	public var size(get, set):Float;
+	public var size(get, set):Int;
 	
 	/**
 	 * The font used for this text (assuming that it's using embedded font).
@@ -43,45 +57,46 @@ class FlxText extends FlxSprite
 	
 	/**
 	 * Whether this text field uses an embedded font (by default) or not. 
-	 * Read-only - use systemFont to specify a system font to use, which then automatically sets this to false.
+	 * Read-only - use `systemFont` to specify a system font to use, which then automatically sets this to `false`.
 	 */
 	public var embedded(get, never):Bool;
 	
 	/**
-	 * The system font for this text (not embedded). Setting this sets embedded to false.
-	 * Passing an invalid font name (like "" or null) causes a default font to be used. 
+	 * The system font for this text (not embedded). Setting this sets `embedded` to `false`.
+	 * Passing an invalid font name (like `""` or `null`) causes a default font to be used. 
 	 */
 	public var systemFont(get, set):String;
 	
 	/**
-	 * Whether to use bold text or not (false by default).
+	 * Whether to use bold text or not (`false` by default).
 	 */
 	public var bold(get, set):Bool;
 	
 	/**
-	 * Whether to use italic text or not (false by default). It only works in openfl.
+	 * Whether to use italic text or not (`false` by default). Only works on Flash.
 	 */
 	public var italic(get, set):Bool;
 	
 	/**
-	 * Whether to use word wrapping and multiline or not (true by default).
+	 * Whether to use word wrapping and multiline or not (`true` by default).
 	 */
 	public var wordWrap(get, set):Bool;
 	
 	/**
-	 * The alignment of the font (LEFT, RIGHT, CENTER or JUSTIFY).
+	 * The alignment of the font. Note: `autoSize` must be set to
+	 * `false` or `alignment` won't show any visual differences.
 	 */
 	public var alignment(get, set):FlxTextAlign;
 	
 	/**
-	 * Use a border style
+	 * The border style to use
 	 */	
 	public var borderStyle(default, set):FlxTextBorderStyle = NONE;
 	
 	/**
-	 * The color of the border in 0xRRGGBB format
+	 * The color of the border in `0xAARRGGBB` format
 	 */	
-	public var borderColor(default, set):Int = FlxColor.TRANSPARENT;
+	public var borderColor(default, set):FlxColor = FlxColor.TRANSPARENT;
 	
 	/**
 	 * The size of the border, in pixels.
@@ -89,126 +104,110 @@ class FlxText extends FlxSprite
 	public var borderSize(default, set):Float = 1;
 	
 	/**
-	 * How many iterations do use when drawing the border. 0: only 1 iteration, 1: one iteration for every pixel in borderSize
-	 * A value of 1 will have the best quality for large border sizes, but might reduce performance when changing text. 
-	 * NOTE: If the borderSize is 1, borderQuality of 0 or 1 will have the exact same effect (and performance).
+	 * How many iterations do use when drawing the border. `0`: only 1 iteration, `1`: one iteration for every pixel in `borderSize`
+	 * A value of `1` will have the best quality for large border sizes, but might reduce performance when changing text. 
+	 * NOTE: If the `borderSize` is `1`, `borderQuality` of `0` or `1` will have the exact same effect (and performance).
 	 */
 	public var borderQuality(default, set):Float = 1;
 	
 	/**
-	 * Internal reference to a Flash TextField object.
+	 * Reference to a `TextField` object used internally for rendering -
+	 * be sure to know what you're doing if messing with its properties!
 	 */
-	public var textField(get, never):TextField;
+	public var textField(default, null):TextField;
 	
 	/**
-	 * The width of the TextField object used for bitmap generation for this FlxText object.
-	 * Use it when you want to change the visible width of text. Enables autoSize if <= 0.
+	 * The width of the `TextField` object used for bitmap generation for this `FlxText` object.
+	 * Use it when you want to change the visible width of text. Enables `autoSize` if `<= 0`.
 	 */
 	public var fieldWidth(get, set):Float;
 	
 	/**
-	 * Whether the fieldWidth should be determined automatically. Requires wordWrap to be false.
+	 * Whether the `fieldWidth` should be determined automatically. Requires `wordWrap` to be `false`.
 	 */
 	public var autoSize(get, set):Bool;
 	
 	/**
 	 * Offset that is applied to the shadow border style, if active. 
-	 * x and y are multiplied by borderSize. Default is (1, 1), or lower-right corner.
+	 * `x` and `y` are multiplied by `borderSize`. Default is `(1, 1)`, or lower-right corner.
 	 */
 	public var shadowOffset(default, null):FlxPoint;
 	
-	/**
-	 * Internal reference to a Flash TextField object.
-	 */
-	private var _textField:TextField;
-	/**
-	 * Internal reference to a Flash TextFormat object.
-	 */
 	private var _defaultFormat:TextFormat;
-	/**
-	 * Internal reference to another helper Flash TextFormat object.
-	 */
 	private var _formatAdjusted:TextFormat;
-	/**
-	 * Internal reference to an Array of FlxTextFormat
-	 */
-	private var _formats:Array<FlxTextFormat>;
-	
-	private var _filters:Array<BitmapFilter>;
-	private var _widthInc:Int = 0;
-	private var _heightInc:Int = 0;
-	
+	private var _formatRanges:Array<FlxTextFormatRange> = [];
 	private var _font:String;
 	
 	/**
-	 * Creates a new FlxText object at the specified position.
+	 * Helper boolean which tells whether to update graphic of this text object or not.
+	 */
+	private var _regen:Bool = true;
+	
+	/**
+	 * Helper vars to draw border styles with transparency.
+	 */
+	private var _borderPixels:BitmapData;
+	
+	private var _borderColorTransform:ColorTransform;
+	
+	private var _hasBorderAlpha = false;
+	
+	#if flash
+	/**
+	 * Helper to draw line by line used at `drawTextFieldTo()`.
+	 */
+	private var _textFieldRect:Rectangle = new Rectangle();
+	#end
+	
+	/**
+	 * Creates a new `FlxText` object at the specified position.
 	 * 
-	 * @param   X              The X position of the text.
-	 * @param   Y              The Y position of the text.
-	 * @param   FieldWidth     The width of the text object. Enables autoSize if <= 0.
-	 *                         (height is determined automatically).
+	 * @param   X              The x position of the text.
+	 * @param   Y              The y position of the text.
+	 * @param   FieldWidth     The `width` of the text object. Enables `autoSize` if `<= 0`.
+	 *                         (`height` is determined automatically).
 	 * @param   Text           The actual text you would like to display initially.
 	 * @param   Size           The font size for this text object.
 	 * @param   EmbeddedFont   Whether this text field uses embedded fonts or not.
 	 */
-	public function new(X:Float = 0, Y:Float = 0, FieldWidth:Float = 0, ?Text:String, Size:Float = 8, EmbeddedFont:Bool = true)
+	public function new(X:Float = 0, Y:Float = 0, FieldWidth:Float = 0, ?Text:String, Size:Int = 8, EmbeddedFont:Bool = true)
 	{
 		super(X, Y);
 		
-		_filters = [];
-		
-		var setTextEmpty:Bool = false;
 		if (Text == null || Text == "")
 		{
 			// empty texts have a textHeight of 0, need to
-			// prevent initialiazing with "" before the first calcFrame() call
-			#if flash
+			// prevent initializing with "" before the first calcFrame() call
+			text = "";
 			Text = " ";
-			#else
-			Text = "";
-			#end
-			setTextEmpty = true;
+		}
+		else
+		{
+			text = Text;
 		}
 		
-		_textField = new TextField();
-		_textField.selectable = false;
-		_textField.multiline = true;
-		_textField.wordWrap = true;
+		textField = new TextField();
+		textField.selectable = false;
+		textField.multiline = true;
+		textField.wordWrap = true;
 		_defaultFormat = new TextFormat(null, Size, 0xffffff);
 		font = FlxAssets.FONT_DEFAULT;
 		_formatAdjusted = new TextFormat();
-		_textField.defaultTextFormat = _defaultFormat;
-		_textField.text = Text;
+		textField.defaultTextFormat = _defaultFormat;
+		textField.text = Text;
 		fieldWidth = FieldWidth;
-		_textField.embedFonts = EmbeddedFont;
-		
-		_formats = new Array<FlxTextFormat>();
+		textField.embedFonts = EmbeddedFont;
 		
 		#if flash
-		_textField.sharpness = 100;
+		textField.sharpness = 100;
 		#end
 		
-		_textField.height = (Text.length <= 0) ? 1 : 10;
+		textField.height = (Text.length <= 0) ? 1 : 10;
 		
 		allowCollisions = FlxObject.NONE;
 		moves = false;
 		
-		var key:String = FlxG.bitmap.getUniqueKey("text");
-		var graphicWidth:Int = (FieldWidth <= 0) ? 1 : Std.int(FieldWidth);
-		makeGraphic(graphicWidth, 1, FlxColor.TRANSPARENT, false, key);
-		
-		#if FLX_RENDER_BLIT 
-		calcFrame();
-		if (setTextEmpty)
-		{
-			text = "";
-		}
-		#else
-		if (Text != "")
-		{
-			calcFrame();
-		}
-		#end
+		drawFrame();
 		
 		shadowOffset = FlxPoint.get(1, 1);
 	}
@@ -218,112 +217,255 @@ class FlxText extends FlxSprite
 	 */
 	override public function destroy():Void
 	{
-		_textField = null;
+		textField = null;
 		_font = null;
 		_defaultFormat = null;
 		_formatAdjusted = null;
-		_filters = null;
-		if (_formats != null)
-		{
-			for (format in _formats)
-			{
-				if (format != null)
-				{
-					format.destroy();
-					format = null;
-				}
-			}
-		}
-		_formats = null;
 		shadowOffset = FlxDestroyUtil.put(shadowOffset);
 		super.destroy();
 	}
 	
-	/**
-	 * Adds another format to this FlxText
-	 * 
-	 * @param	Format	The format to be added.
-	 * @param	Start	(Default = -1) The start index of the string where the format will be applied. If greater than -1, this value will override the format.start value.
-	 * @param	End		(Default = -1) The end index of the string where the format will be applied. If greater than -1, this value will override the format.start value.
-	 */
-	public function addFormat(Format:FlxTextFormat, Start:Int = -1, End:Int = -1):Void
+	override public function drawFrame(Force:Bool = false):Void 
 	{
-		Format.start = (Start > -1) ? Start : Format.start;
-		Format.end = (End > -1) ? End : Format.end;
-		_formats.push(Format);
-		// sort the array using the start value of the format so we can skip formats that can't be applied to the textField
-		_formats.sort(function(left:FlxTextFormat, right:FlxTextFormat) { return left.start < right.start ? -1 : 1; } );
-		dirty = true;
+		_regen = _regen || Force;
+		super.drawFrame(_regen);
 	}
 	
 	/**
-	 * Removes a specific FlxTextFormat from this text.
+	 * Stamps text onto specified atlas object and loads graphic from this atlas.
+	 * WARNING: Changing text after stamping it on the atlas will break the atlas, so do it only for
+	 * static texts and only after making all the text customizing (like `size`, `alignment`, `color`, etc.)
+	 * 
+	 * @param	atlas	atlas to stamp graphic to.
+	 * @return	whether the graphic was stamped on the atlas successfully
 	 */
-	public inline function removeFormat(Format:FlxTextFormat):Void
+	public function stampOnAtlas(atlas:FlxAtlas):Bool
 	{
-		FlxArrayUtil.fastSplice(_formats, Format);
-		dirty = true;
+		regenGraphic();
+		
+		var node:FlxNode = atlas.addNode(graphic.bitmap, graphic.key);
+		var result:Bool = (node != null);
+		
+		if (node != null)
+		{
+			frames = node.getImageFrame();
+		}
+		
+		return result;
+	}
+	
+	/**
+	 * Applies formats to text between marker characters, then removes those markers.
+	 * NOTE: this will clear all `FlxTextFormat`s and return to the default format.
+	 * 
+	 * Usage: 
+	 * 
+	 * ```haxe
+	 * text.applyMarkup(
+	 * 	"show $green text$ between dollar-signs",
+	 * 	[new FlxTextFormatMarkerPair(greenFormat, "$")]
+	 * );
+	 * ```
+	 * 
+	 * Even works for complex nested formats like this:
+	 * 
+	 * ```haxe
+	 * var yellow = new FlxTextFormatMarkerPair(yellowFormat, "@");
+	 * var green = new FlxTextFormatMarkerPair(greenFormat, "<g>");
+	 * text.applyMarkup("Hey @Buddy@, what <g>is<g> going @on<g>?<g>@", [yellow, green]);
+	 * ```
+	 * 
+	 * @param   input   The text you want to format
+	 * @param   rules   `FlxTextFormat`s to selectively apply, paired with marker strings
+	 */
+	public function applyMarkup(input:String, rules:Array<FlxTextFormatMarkerPair>):FlxText
+	{
+		if (rules == null || rules.length == 0)
+			return this; // there's no point in running the big loop
+		
+		clearFormats(); // start with default formatting
+		
+		var rangeStarts:Array<Int> = [];
+		var rangeEnds:Array<Int> = [];
+		var rulesToApply:Array<FlxTextFormatMarkerPair> = [];
+		
+		var i:Int = 0;
+		for (rule in rules)
+		{
+			if (rule.marker == null || rule.format == null)
+				continue;
+
+			var start:Bool = false;
+			var markerLength:Int = Utf8.length(rule.marker);
+			
+			if (input.indexOf(rule.marker) == -1)  
+				continue; // marker not present
+
+			// inspect each character
+			for (charIndex in 0...Utf8.length(input))
+			{
+				if (Utf8.compare(Utf8.sub(input, charIndex, markerLength), rule.marker) != 0)
+					continue; // it's not one of the markers
+
+				if (start)   
+				{
+					start = false;
+					rangeEnds.push(charIndex); //end a format block
+				}
+				else // we're outside of a format block
+				{
+					start = true; //start a format block
+					rangeStarts.push(charIndex);
+					rulesToApply.push(rule);
+				}
+			}
+
+			if (start)
+			{
+				// we ended with an unclosed block, mark it as infinite
+				rangeEnds.push(-1);
+			}
+
+			i++;
+		}
+		
+		// Remove all of the markers in the string
+		for (rule in rules)
+			input = input.remove(rule.marker);
+		
+		// Adjust all the ranges to reflect the removed markers
+		for (i in 0...rangeStarts.length)
+		{
+			// Consider each range start
+			var delIndex:Int = rangeStarts[i];
+			var markerLength:Int = Utf8.length(rulesToApply[i].marker);
+			
+			// Any start or end index that is HIGHER than this must be subtracted by one markerLength
+			for (j in 0...rangeStarts.length)
+			{
+				if (rangeStarts[j] > delIndex)
+				{
+					rangeStarts[j] -= markerLength;
+				}
+				if (rangeEnds[j] > delIndex)
+				{
+					rangeEnds[j] -= markerLength;
+				}
+			}
+			
+			// Consider each range end
+			delIndex = rangeEnds[i];
+			
+			// Any start or end index that is HIGHER than this must be subtracted by one markerLength
+			for (j in 0...rangeStarts.length)
+			{
+				if (rangeStarts[j] > delIndex)
+				{
+					rangeStarts[j] -= markerLength;
+				}
+				if (rangeEnds[j] > delIndex)
+				{
+					rangeEnds[j] -= markerLength;
+				}
+			}
+		}
+		
+		// Apply the new text
+		text = input;
+		
+		// Apply each format selectively to the given range
+		for (i in 0...rangeStarts.length)
+			addFormat(rulesToApply[i].format, rangeStarts[i], rangeEnds[i]);
+		
+		return this;
+	}
+	
+	/**
+	 * Adds another format to this `FlxText`
+	 * 
+	 * @param	Format	The format to be added.
+	 * @param	Start	The start index of the string where the format will be applied.
+	 * @param	End		The end index of the string where the format will be applied.
+	 */
+	public function addFormat(Format:FlxTextFormat, Start:Int = -1, End:Int = -1):FlxText
+	{
+		_formatRanges.push(new FlxTextFormatRange(Format, Start, End));
+		// sort the array using the start value of the format so we can skip formats that can't be applied to the textField
+		_formatRanges.sort(function(left, right)
+		{ 
+			return left.range.start < right.range.start ? -1 : 1;
+		});
+		_regen = true;
+		
+		return this;
+	}
+	
+	/**
+	 * Removes a specific `FlxTextFormat` from this text.
+	 * If a range is specified, this only removes the format when it touches that range.
+	 */
+	public inline function removeFormat(Format:FlxTextFormat, ?Start:Int, ?End:Int):FlxText
+	{
+		for (formatRange in _formatRanges)
+		{
+			if (formatRange.format != Format)
+				continue;
+			
+			if (Start != null && End != null &&
+				(Start > formatRange.range.end || End < formatRange.range.start))
+				continue;
+			
+			_formatRanges.remove(formatRange);
+		}
+		_regen = true;
+		
+		return this;
 	}
 	
 	/**
 	 * Clears all the formats applied.
 	 */
-	public function clearFormats():Void
+	public function clearFormats():FlxText
 	{
-		for (format in _formats)
-		{
-			format.destroy();
-			format = null;
-		}
+		_formatRanges = [];
+		updateDefaultFormat();
 		
-		_formats = [];
-		
-		updateFormat(_defaultFormat);
-		dirty = true;
+		return this;
 	}
 	
-	
 	/**
-	 * You can use this if you have a lot of text parameters
-	 * to set instead of the individual properties.
+	 * You can use this if you have a lot of text parameters to set instead of the individual properties.
 	 * 
 	 * @param	Font			The name of the font face for the text display.
 	 * @param	Size			The size of the font (in pixels essentially).
-	 * @param	Color			The color of the text in traditional flash 0xRRGGBB format.
+	 * @param	Color			The color of the text in `0xRRGGBB` format.
 	 * @param	Alignment		The desired alignment
-	 * @param	BorderStyle		NONE, SHADOW, OUTLINE, or OUTLINE_FAST (use setBorderFormat)
-	 * @param	BorderColor 	Int, color for the border, 0xRRGGBB format
+	 * @param	BorderStyle		Which border style to use
+	 * @param	BorderColor 	Color for the border, `0xAARRGGBB` format
 	 * @param	EmbeddedFont	Whether this text field uses embedded fonts or not
-	 * @return	This FlxText instance (nice for chaining stuff together, if you're into that).
+	 * @return	This `FlxText` instance (nice for chaining stuff together, if you're into that).
 	 */
-	public function setFormat(?Font:String, Size:Float = 8, Color:FlxColor = FlxColor.WHITE, ?Alignment:FlxTextAlign, 
-		?BorderStyle:FlxTextBorderStyle, BorderColor:FlxColor = 0, Embedded:Bool = true):FlxText
+	public function setFormat(?Font:String, Size:Int = 8, Color:FlxColor = FlxColor.WHITE, ?Alignment:FlxTextAlign, 
+		?BorderStyle:FlxTextBorderStyle, BorderColor:FlxColor = FlxColor.TRANSPARENT, EmbeddedFont:Bool = true):FlxText
 	{
-		if (BorderStyle == null)
-		{
-			BorderStyle = NONE;
-		}
+		BorderStyle = (BorderStyle == null) ? NONE : BorderStyle;
 		
-		if (Embedded)
+		if (EmbeddedFont)
 		{
 			font = Font;
 		}
 		else if (Font != null)
 		{
-			_defaultFormat.font = Font;
+			systemFont = Font;
 		}
 		
-		_textField.embedFonts = Embedded;
+		size = Size;
+		color = Color;
+		if (Alignment != null)
+			alignment = Alignment;
+		setBorderStyle(BorderStyle, BorderColor);
 		
-		_defaultFormat.size = Size;
-		Color &= 0x00ffffff;
-		_defaultFormat.color = Color;
-		_defaultFormat.align = convertTextAlignmentFromString(Alignment);
-		_textField.defaultTextFormat = _defaultFormat;
-		borderStyle = BorderStyle;
-		borderColor = BorderColor;
-		updateFormat(_defaultFormat);
-		dirty = true;
+		updateDefaultFormat();
 		
 		return this;
 	}
@@ -331,117 +473,53 @@ class FlxText extends FlxSprite
 	/**
 	 * Set border's style (shadow, outline, etc), color, and size all in one go!
 	 * 
-	 * @param	Style outline style - NONE, SHADOW, OUTLINE, OUTLINE_FAST
-	 * @param	Color outline color in flash 0xRRGGBB format
+	 * @param	Style outline style
+	 * @param	Color outline color in `0xAARRGGBB` format
 	 * @param	Size outline size in pixels
-	 * @param	Quality outline quality - # of iterations to use when drawing. 0:just 1, 1:equal number to BorderSize
+	 * @param	Quality outline quality - # of iterations to use when drawing. `0`: just 1, `1`: equal number to `Size`
 	 */
-	public inline function setBorderStyle(Style:FlxTextBorderStyle, Color:FlxColor = 0, Size:Float = 1, Quality:Float = 1):Void 
+	public inline function setBorderStyle(Style:FlxTextBorderStyle, Color:FlxColor = 0, Size:Float = 1, Quality:Float = 1):FlxText 
 	{
 		borderStyle = Style;
 		borderColor = Color;
 		borderSize = Size;
 		borderQuality = Quality;
-	}
-	
-	public inline function addFilter(filter:BitmapFilter, widthInc:Int = 0, heightInc:Int = 0):Void
-	{
-		_filters.push(filter);
-		_widthInc = widthInc;
-		_heightInc = heightInc;
-		dirty = true;
-	}
-	
-	public function removeFilter(filter:BitmapFilter):Void
-	{
-		var removed:Bool = _filters.remove(filter);
-		if (removed)
-		{
-			dirty = true;
-		}
-	}
-	
-	public function clearFilters():Void
-	{
-		if (_filters.length > 0)
-		{
-			dirty = true;
-		}
-		_filters = [];
-	}
-	
-	override public function updateFrameData():Void
-	{
-		if (cachedGraphics != null)
-		{
-			framesData = cachedGraphics.tilesheet.getSpriteSheetFrames(region);
-			frame = framesData.frames[0];
-			frames = 1;
-		}
-	}
-	
-	private inline function applyFormats(FormatAdjusted:TextFormat, UseBorderColor:Bool = false):Void
-	{
-		// Apply the default format
-		FormatAdjusted.color = UseBorderColor ? borderColor : _defaultFormat.color;
-		updateFormat(FormatAdjusted);
 		
-		// Apply other formats
-		for (format in _formats)
-		{
-			if (_textField.text.length - 1 < format.start) 
-			{
-				// we can break safely because the array is ordered by the format start value
-				break;
-			}
-			else 
-			{
-				FormatAdjusted.font    = format.format.font;
-				FormatAdjusted.bold    = format.format.bold;
-				FormatAdjusted.italic  = format.format.italic;
-				FormatAdjusted.size    = format.format.size;
-				FormatAdjusted.color   = UseBorderColor ? format.borderColor : format.format.color;
-			}
-			
-			_textField.setTextFormat(FormatAdjusted, format.start, Std.int(Math.min(format.end, _textField.text.length)));
-		}
+		return this;
 	}
 	
 	private function set_fieldWidth(value:Float):Float
 	{
-		if (_textField != null)
+		if (textField == null)
+			return value;
+		
+		if (value <= 0)
 		{
-			if (value <= 0)
-			{
-				wordWrap = false;
-				autoSize = true;
-			}
-			else
-			{
-				_textField.width = value;
-			}
-			
-			dirty = true;
+			wordWrap = false;
+			autoSize = true;
+		}
+		else
+		{
+			autoSize = false;
+			wordWrap = true;
+			textField.width = value;
 		}
 		
+		_regen = true;
 		return value;
 	}
 	
 	private function get_fieldWidth():Float
 	{
-		return (_textField != null) ? _textField.width : 0;
+		return (textField != null) ? textField.width : 0;
 	}
 	
 	private function set_autoSize(value:Bool):Bool
 	{
-		if (_textField != null)
+		if (textField != null)
 		{
-			if (value)
-				_textField.autoSize = TextFieldAutoSize.LEFT;
-			else
-				_textField.autoSize = TextFieldAutoSize.NONE;
-			
-			dirty = true;
+			textField.autoSize = value ? TextFieldAutoSize.LEFT : TextFieldAutoSize.NONE;
+			_regen = true;
 		}
 		
 		return value;
@@ -449,57 +527,42 @@ class FlxText extends FlxSprite
 	
 	private function get_autoSize():Bool
 	{
-		return (_textField != null) ? (_textField.autoSize != TextFieldAutoSize.NONE) : false;
-	}
-	
-	private function get_text():String
-	{
-		return _textField.text;
+		return (textField != null) ? (textField.autoSize != TextFieldAutoSize.NONE) : false;
 	}
 	
 	private function set_text(Text:String):String
 	{
-		var ot:String = _textField.text;
-		_textField.text = Text;
-		
-		if (_textField.text != ot)
+		text = Text;
+		if (textField != null)
 		{
-			dirty = true;
+			var ot:String = textField.text;
+			textField.text = Text;
+			_regen = (textField.text != ot) || _regen;
 		}
-		
-		return _textField.text;
+		return Text;
 	}
 	
-	private function get_size():Float
+	private inline function get_size():Int
 	{
-		return _defaultFormat.size;
+		return Std.int(_defaultFormat.size);
 	}
 	
-	private function set_size(Size:Float):Float
+	private function set_size(Size:Int):Int
 	{
 		_defaultFormat.size = Size;
-		_textField.defaultTextFormat = _defaultFormat;
-		updateFormat(_defaultFormat);
-		dirty = true;
-		
+		updateDefaultFormat();
 		return Size;
 	}
 	
-	/**
-	 * The color of the text being displayed.
-	 */
 	override private function set_color(Color:FlxColor):Int
 	{
-		Color &= 0x00ffffff;
-		if (_defaultFormat.color == Color)
+		if (_defaultFormat.color == Color.to24Bit())
 		{
 			return Color;
 		}
-		_defaultFormat.color = Color;
+		_defaultFormat.color = Color.to24Bit();
 		color = Color;
-		_textField.defaultTextFormat = _defaultFormat;
-		updateFormat(_defaultFormat);
-		dirty = true;
+		updateDefaultFormat();
 		return Color;
 	}
 	
@@ -510,7 +573,7 @@ class FlxText extends FlxSprite
 	
 	private function set_font(Font:String):String
 	{
-		_textField.embedFonts = true;
+		textField.embedFonts = true;
 		
 		if (Font != null)
 		{
@@ -527,15 +590,13 @@ class FlxText extends FlxSprite
 			_defaultFormat.font = FlxAssets.FONT_DEFAULT;
 		}
 		
-		_textField.defaultTextFormat = _defaultFormat;
-		updateFormat(_defaultFormat);
-		dirty = true;
+		updateDefaultFormat();
 		return _font = _defaultFormat.font;
 	}
 	
 	private inline function get_embedded():Bool
 	{
-		return _textField.embedFonts = true;
+		return textField.embedFonts = true;
 	}
 	
 	private inline function get_systemFont():String
@@ -545,11 +606,9 @@ class FlxText extends FlxSprite
 	
 	private function set_systemFont(Font:String):String
 	{
-		_textField.embedFonts = false;
+		textField.embedFonts = false;
 		_defaultFormat.font = Font;
-		_textField.defaultTextFormat = _defaultFormat;
-		updateFormat(_defaultFormat);
-		dirty = true;
+		updateDefaultFormat();
 		return Font;
 	}
 	
@@ -563,9 +622,7 @@ class FlxText extends FlxSprite
 		if (_defaultFormat.bold != value)
 		{
 			_defaultFormat.bold = value;
-			_textField.defaultTextFormat = _defaultFormat;
-			updateFormat(_defaultFormat);
-			dirty = true;
+			updateDefaultFormat();
 		}
 		return value;
 	}
@@ -580,171 +637,237 @@ class FlxText extends FlxSprite
 		if (_defaultFormat.italic != value)
 		{
 			_defaultFormat.italic = value;
-			_textField.defaultTextFormat = _defaultFormat;
-			updateFormat(_defaultFormat);
-			dirty = true;
+			updateDefaultFormat();
 		}
 		return value;
 	}
 	
 	private inline function get_wordWrap():Bool 
 	{ 
-		return _textField.wordWrap; 
+		return textField.wordWrap; 
 	}
 	
 	private function set_wordWrap(value:Bool):Bool
 	{
-		if (_textField.wordWrap != value)
+		if (textField.wordWrap != value)
 		{
-			_textField.wordWrap = value;
-		//	_textField.multiline = value;
-			dirty = true;
+			textField.wordWrap = value;
+			_regen = true;
 		}
 		return value;
 	}
 	
 	private inline function get_alignment():FlxTextAlign
 	{
-		return cast(_defaultFormat.align, String);
+		return FlxTextAlign.fromOpenFL(_defaultFormat.align);
 	}
 	
 	private function set_alignment(Alignment:FlxTextAlign):FlxTextAlign
 	{
-		_defaultFormat.align = convertTextAlignmentFromString(Alignment);
-		_textField.defaultTextFormat = _defaultFormat;
-		updateFormat(_defaultFormat);
-		dirty = true;
+		_defaultFormat.align = FlxTextAlign.toOpenFL(Alignment);
+		updateDefaultFormat();
 		return Alignment;
 	}
 	
 	private function set_borderStyle(style:FlxTextBorderStyle):FlxTextBorderStyle
-	{		
+	{
 		if (style != borderStyle)
-		{
-			borderStyle = style;
-			dirty = true;
-		}
+			_regen = true;
 		
-		return borderStyle;
+		return borderStyle = style;
 	}
 	
-	private function set_borderColor(Color:FlxColor):Int
+	private function set_borderColor(Color:FlxColor):FlxColor
 	{
-		Color &= 0x00ffffff;
-		
 		if (borderColor != Color && borderStyle != NONE)
-		{
-			dirty = true;
-		}
-		borderColor = Color;
-		
-		return Color;
+			_regen = true;
+		_hasBorderAlpha = Color.alphaFloat < 1;
+		return borderColor = Color;
 	}
 	
 	private function set_borderSize(Value:Float):Float
 	{
 		if (Value != borderSize && borderStyle != NONE)
-		{			
-			dirty = true;
-		}
-		borderSize = Value;
+			_regen = true;
 		
-		return Value;
+		return borderSize = Value;
 	}
 	
 	private function set_borderQuality(Value:Float):Float
 	{
-		if (Value < 0)
-			Value = 0;
-		else if (Value > 1)
-			Value = 1;
-		
+		Value = FlxMath.bound(Value, 0, 1);
 		if (Value != borderQuality && borderStyle != NONE)
-		{
-			dirty = true;
-		}
-		borderQuality = Value;
+			_regen = true;
 		
-		return Value;
+		return borderQuality = Value;
 	}
 	
-	private function get_textField():TextField 
+	override private function set_graphic(Value:FlxGraphic):FlxGraphic 
 	{
-		return _textField;
+		var oldGraphic:FlxGraphic = graphic;
+		var graph:FlxGraphic = super.set_graphic(Value);
+		FlxG.bitmap.removeIfNoUse(oldGraphic);
+		return graph;
 	}
 	
-	override private function set_cachedGraphics(Value:CachedGraphics):CachedGraphics 
+	override private function get_width():Float 
 	{
-		var cached:CachedGraphics = super.set_cachedGraphics(Value);
-		
-		if (Value != null)
-			Value.destroyOnNoUse = true;
-		
-		return cached;
+		regenGraphic();
+		return super.get_width();
+	}
+	
+	override private function get_height():Float 
+	{
+		regenGraphic();
+		return super.get_height();
 	}
 	
 	override private function updateColorTransform():Void
 	{
+		if (colorTransform == null)
+			colorTransform = new ColorTransform();
+		
 		if (alpha != 1)
 		{
-			if (colorTransform == null)
-			{
-				colorTransform = new ColorTransform(1, 1, 1, alpha);
-			}
-			else
-			{
-				colorTransform.alphaMultiplier = alpha;
-			}
+			colorTransform.alphaMultiplier = alpha;
 			useColorTransform = true;
 		}
 		else
 		{
-			if (colorTransform != null)
-			{
-				colorTransform.alphaMultiplier = 1;
-			}
-			
+			colorTransform.alphaMultiplier = 1;
 			useColorTransform = false;
 		}
 		
 		dirty = true;
 	}
 	
-	private function regenGraphics():Void
+	private function regenGraphic():Void
 	{
-		var oldWidth:Float = cachedGraphics.bitmap.width;
-		var oldHeight:Float = cachedGraphics.bitmap.height;
+		if (textField == null || !_regen)
+			return;
 		
-		var newWidth:Float = _textField.width + _widthInc;
-		// Account for 2px gutter on top and bottom (that's why there is "+ 4")
-		var newHeight:Float = _textField.textHeight + _heightInc + 4;
+		var oldWidth:Int = 0;
+		var oldHeight:Int = VERTICAL_GUTTER;
+		
+		if (graphic != null)
+		{
+			oldWidth = graphic.width;
+			oldHeight = graphic.height;
+		}
+		
+		var newWidth:Float = textField.width;
+		// Account for gutter
+		var newHeight:Float = textField.textHeight + VERTICAL_GUTTER;
 		
 		// prevent text height from shrinking on flash if text == ""
-		if (_textField.textHeight == 0) 
+		if (textField.textHeight == 0) 
 		{
 			newHeight = oldHeight;
 		}
 		
-		if ((oldWidth != newWidth) || (oldHeight != newHeight))
+		if (oldWidth != newWidth || oldHeight != newHeight)
 		{
 			// Need to generate a new buffer to store the text graphic
-			height = newHeight - _heightInc;
-			var key:String = cachedGraphics.key;
-			FlxG.bitmap.remove(key);
+			height = newHeight;
+			var key:String = FlxG.bitmap.getUniqueKey("text");
 			
 			makeGraphic(Std.int(newWidth), Std.int(newHeight), FlxColor.TRANSPARENT, false, key);
+			if (_hasBorderAlpha)
+				_borderPixels = graphic.bitmap.clone();
 			frameHeight = Std.int(height);
-			_textField.height = height * 1.2;
+			textField.height = height * 1.2;
 			_flashRect.x = 0;
 			_flashRect.y = 0;
 			_flashRect.width = newWidth;
 			_flashRect.height = newHeight;
 		}
-		// Else just clear the old buffer before redrawing the text
-		else
+		else // Else just clear the old buffer before redrawing the text
 		{
-			cachedGraphics.bitmap.fillRect(_flashRect, FlxColor.TRANSPARENT);
+			graphic.bitmap.fillRect(_flashRect, FlxColor.TRANSPARENT);
+			if (_hasBorderAlpha)
+			{
+				if (_borderPixels == null)
+					_borderPixels = new BitmapData(frameWidth, frameHeight, true);
+				else
+					_borderPixels.fillRect(_flashRect, FlxColor.TRANSPARENT);
+			}
 		}
+		
+		if (textField != null && textField.text != null && textField.text.length > 0)
+		{
+			// Now that we've cleared a buffer, we need to actually render the text to it
+			copyTextFormat(_defaultFormat, _formatAdjusted);
+			
+			_matrix.identity();
+			
+			applyBorderStyle();
+			applyBorderTransparency();
+			applyFormats(_formatAdjusted, false);
+			
+			drawTextFieldTo(graphic.bitmap);
+		}
+		
+		_regen = false;
+		resetFrame();
+	}
+	
+	/**
+	 * Internal function to draw textField to a BitmapData, if flash it calculates every line x to avoid blurry lines.
+	 */
+	private function drawTextFieldTo(graphic:BitmapData):Void
+	{
+		#if flash
+		if (alignment == FlxTextAlign.CENTER && isTextBlurry())
+		{
+			var h:Int = 0;
+			var tx:Float = _matrix.tx;
+			for (i in 0...textField.numLines) 
+			{
+				var lineMetrics = textField.getLineMetrics(i);
+				
+				// Workaround for blurry lines caused by non-integer x positions on flash
+				var diff:Float = lineMetrics.x - Std.int(lineMetrics.x);
+				if (diff != 0)
+				{
+					_matrix.tx = tx + diff;
+				}
+				_textFieldRect.setTo(0, h, textField.width, lineMetrics.height + lineMetrics.descent);
+				
+				graphic.draw(textField, _matrix, null, null, _textFieldRect, false);
+				
+				_matrix.tx = tx;
+				h += Std.int(lineMetrics.height);
+			}
+			
+			return;
+		}
+		#end
+		
+		graphic.draw(textField, _matrix);
+	}
+	
+	#if flash
+	/**
+	 * Helper function for `drawTextFieldTo()`, this checks if thw workaround is needed to prevent blurry lines.
+	 */
+	private function isTextBlurry():Bool
+	{
+		for (i in 0...textField.numLines) 
+		{
+			var lineMetricsX = textField.getLineMetrics(i).x;
+			if (lineMetricsX - Std.int(lineMetricsX) != 0)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+	#end
+	
+	override public function preDrawCheck():Bool 
+	{
+		regenGraphic();
+		return super.preDrawCheck();
 	}
 	
 	/**
@@ -754,257 +877,212 @@ class FlxText extends FlxSprite
 	 */
 	override private function calcFrame(RunOnCpp:Bool = false):Void
 	{
-		if (_textField == null)
-		{
+		if (textField == null)
 			return;
-		}
 		
-		if (_filters != null)
-		{
-			_textField.filters = _filters;
-		}
-		
-		regenGraphics();
-		
-		if ((_textField != null) && (_textField.text != null) && (_textField.text.length > 0))
-		{
-			// Now that we've cleared a buffer, we need to actually render the text to it
-			_formatAdjusted.font   = _defaultFormat.font;
-			_formatAdjusted.size   = _defaultFormat.size;
-			_formatAdjusted.bold   = _defaultFormat.bold;
-			_formatAdjusted.italic = _defaultFormat.italic;
-			_formatAdjusted.color  = _defaultFormat.color;
-			_formatAdjusted.align  = _defaultFormat.align;
-			_matrix.identity();
-			
-			_matrix.translate(Std.int(0.5 * _widthInc), Std.int(0.5 * _heightInc));
-			
-			// If it's a single, centered line of text, we center it ourselves so it doesn't blur to hell
-			if ((_defaultFormat.align == TextFormatAlign.CENTER) && (_textField.numLines == 1))
-			{
-				_formatAdjusted.align = TextFormatAlign.LEFT;
-				updateFormat(_formatAdjusted);
-				
-				#if flash
-				_matrix.translate(Math.floor((width - _textField.getLineMetrics(0).width) / 2), 0);
-				#else
-				_matrix.translate(Math.floor((width - _textField.textWidth) / 2), 0);
-				#end
-			}
-			
-			if (borderStyle != NONE)
-			{
-				var iterations:Int = Std.int(borderSize * borderQuality);
-				if (iterations <= 0) 
-				{ 
-					iterations = 1;
-				}
-				var delta:Float = (borderSize / iterations);
-				
-				if (borderStyle == SHADOW) 
-				{
-					//Render a shadow beneath the text
-					//(do one lower-right offset draw call)
-					applyFormats(_formatAdjusted, true);
-					
-					for (iter in 0...iterations)
-					{
-						_matrix.translate(delta, delta);
-						cachedGraphics.bitmap.draw(_textField, _matrix);
-					}
-					
-					_matrix.translate( -shadowOffset.x * borderSize, -shadowOffset.y * borderSize);
-					applyFormats(_formatAdjusted, false);
-				}
-				else if (borderStyle == OUTLINE) 
-				{
-					//Render an outline around the text
-					//(do 8 offset draw calls)
-					applyFormats(_formatAdjusted, true);
-					
-					var itd:Float = delta;
-					for (iter in 0...iterations)
-					{
-						_matrix.translate(-itd, -itd);		//upper-left
-						cachedGraphics.bitmap.draw(_textField, _matrix);
-						_matrix.translate(itd, 0);			//upper-middle
-						cachedGraphics.bitmap.draw(_textField, _matrix);
-						_matrix.translate(itd, 0);			//upper-right
-						cachedGraphics.bitmap.draw(_textField, _matrix);
-						_matrix.translate(0, itd);			//middle-right
-						cachedGraphics.bitmap.draw(_textField, _matrix);
-						_matrix.translate(0, itd);			//lower-right
-						cachedGraphics.bitmap.draw(_textField, _matrix);
-						_matrix.translate(-itd, 0);			//lower-middle
-						cachedGraphics.bitmap.draw(_textField, _matrix);
-						_matrix.translate(-itd, 0);			//lower-left
-						cachedGraphics.bitmap.draw(_textField, _matrix);
-						_matrix.translate(0, -itd);			//middle-left
-						cachedGraphics.bitmap.draw(_textField, _matrix);
-						_matrix.translate(itd, 0);			//return to center
-						itd += delta;
-					} 
-					
-					applyFormats(_formatAdjusted, false);
-				}
-				else if (borderStyle == OUTLINE_FAST) 
-				{
-					//Render an outline around the text
-					//(do 4 diagonal offset draw calls)
-					//(this method might not work with certain narrow fonts)
-					applyFormats(_formatAdjusted, true);
-					
-					var itd:Float = delta;
-					for (iter in 0...iterations)
-					{
-						_matrix.translate(-itd, -itd);			//upper-left
-						cachedGraphics.bitmap.draw(_textField, _matrix);
-						_matrix.translate(itd*2, 0);			//upper-right
-						cachedGraphics.bitmap.draw(_textField, _matrix);
-						_matrix.translate(0, itd*2);			//lower-right
-						cachedGraphics.bitmap.draw(_textField, _matrix);
-						_matrix.translate(-itd*2, 0);			//lower-left
-						cachedGraphics.bitmap.draw(_textField, _matrix);
-						_matrix.translate(itd, -itd);			//return to center
-						itd += delta;
-					}
-					
-					applyFormats(_formatAdjusted, false);
-				}
-			}
-			else
-			{
-				applyFormats(_formatAdjusted, false);
-			}
-			
-			//Actually draw the text onto the buffer
-			cachedGraphics.bitmap.draw(_textField, _matrix);
-		}
-		
-		dirty = false;
-		
-		#if FLX_RENDER_TILE
-		if (!RunOnCpp)
-		{
+		if (FlxG.renderTile && !RunOnCpp)
 			return;
-		}
-		#end
 		
-		//Finally, update the visible pixels
-		if ((framePixels == null) || (framePixels.width != cachedGraphics.bitmap.width) || (framePixels.height != cachedGraphics.bitmap.height))
+		regenGraphic();
+		super.calcFrame(RunOnCpp);
+	}
+	
+	private function applyBorderStyle():Void
+	{
+		var iterations:Int = Std.int(borderSize * borderQuality);
+		if (iterations <= 0) 
+		{ 
+			iterations = 1;
+		}
+		var delta:Float = borderSize / iterations;
+		
+		switch (borderStyle)
 		{
-			framePixels = FlxDestroyUtil.dispose(framePixels);
-			framePixels = new BitmapData(cachedGraphics.bitmap.width, cachedGraphics.bitmap.height, true, 0);
+			case SHADOW:
+				//Render a shadow beneath the text
+				//(do one lower-right offset draw call)
+				applyFormats(_formatAdjusted, true);
+				
+				for (i in 0...iterations)
+				{
+					copyTextWithOffset(delta, delta);
+				}
+				
+				_matrix.translate( -shadowOffset.x * borderSize, -shadowOffset.y * borderSize);
+				
+			case OUTLINE:
+				//Render an outline around the text
+				//(do 8 offset draw calls)
+				applyFormats(_formatAdjusted, true);
+				
+				var curDelta:Float = delta;
+				for (i in 0...iterations)
+				{
+					copyTextWithOffset( -curDelta, -curDelta); //upper-left
+					copyTextWithOffset(curDelta, 0);           //upper-middle
+					copyTextWithOffset(curDelta, 0);           //upper-right
+					copyTextWithOffset(0, curDelta);           //middle-right
+					copyTextWithOffset(0, curDelta);           //lower-right
+					copyTextWithOffset( -curDelta, 0);         //lower-middle
+					copyTextWithOffset( -curDelta, 0);         //lower-left
+					copyTextWithOffset(0, -curDelta);          //lower-left
+					
+					_matrix.translate(curDelta, 0);            //return to center
+					curDelta += delta;
+				}
+				
+			case OUTLINE_FAST:
+				//Render an outline around the text
+				//(do 4 diagonal offset draw calls)
+				//(this method might not work with certain narrow fonts)
+				applyFormats(_formatAdjusted, true);
+				
+				var curDelta:Float = delta;
+				for (i in 0...iterations)
+				{
+					copyTextWithOffset( -curDelta, -curDelta); //upper-left
+					copyTextWithOffset(curDelta * 2, 0);       //upper-right
+					copyTextWithOffset(0, curDelta * 2);       //lower-right
+					copyTextWithOffset( -curDelta * 2, 0);     //lower-left
+					
+					_matrix.translate(curDelta, -curDelta);    //return to center
+					curDelta += delta;
+				}
+				
+			case NONE:
 		}
+	}
+	
+	private inline function applyBorderTransparency()
+	{
+		if (!_hasBorderAlpha)
+			return;
 		
-		framePixels.copyPixels(cachedGraphics.bitmap, _flashRect, _flashPointZero);
+		if (_borderColorTransform == null)
+			_borderColorTransform = new ColorTransform();
+			
+		_borderColorTransform.alphaMultiplier = borderColor.alphaFloat;
+		_borderPixels.colorTransform(_borderPixels.rect, _borderColorTransform);
+		graphic.bitmap.draw(_borderPixels);
+	}
+	
+	/**
+	 * Helper function for `applyBorderStyle()`
+	 */
+	private inline function copyTextWithOffset(x:Float, y:Float)
+	{
+		var graphic:BitmapData = _hasBorderAlpha ? _borderPixels : graphic.bitmap;
+		_matrix.translate(x, y);
+		drawTextFieldTo(graphic);
+	}
+	
+	private function applyFormats(FormatAdjusted:TextFormat, UseBorderColor:Bool = false):Void
+	{
+		// Apply the default format
+		copyTextFormat(_defaultFormat, FormatAdjusted, false);
+		FormatAdjusted.color = UseBorderColor ? borderColor.to24Bit() : _defaultFormat.color;
+		textField.setTextFormat(FormatAdjusted);
 		
-		if (useColorTransform) 
+		// Apply other formats
+		for (formatRange in _formatRanges)
 		{
-			framePixels.colorTransform(_flashRect, colorTransform);
+			if (textField.text.length - 1 < formatRange.range.start) 
+			{
+				// we can break safely because the array is ordered by the format start value
+				break;
+			}
+			else 
+			{
+				var textFormat:TextFormat = formatRange.format.format;
+				copyTextFormat(textFormat, FormatAdjusted, false);
+				FormatAdjusted.color = UseBorderColor ? formatRange.format.borderColor.to24Bit() : textFormat.color;
+			}
+			
+			textField.setTextFormat(FormatAdjusted, formatRange.range.start,
+				Std.int(Math.min(formatRange.range.end, textField.text.length)));
 		}
+	}
+	
+	private function copyTextFormat(from:TextFormat, to:TextFormat, withAlign:Bool = true):Void
+	{
+		to.font = from.font;
+		to.bold = from.bold;
+		to.italic = from.italic;
+		to.size = from.size;
+		to.color = from.color;
+		if (withAlign)
+			to.align = from.align;
 	}
 	
 	/**
 	 * A helper function for updating the TextField that we use for rendering.
 	 * 
-	 * @return	A writable copy of TextField.defaultTextFormat.
+	 * @return	A writable copy of `TextField.defaultTextFormat`.
 	 */
 	private function dtfCopy():TextFormat
 	{
-		var defaultTextFormat:TextFormat = _textField.defaultTextFormat;
-		
-		return new TextFormat(defaultTextFormat.font, defaultTextFormat.size, defaultTextFormat.color, defaultTextFormat.bold, defaultTextFormat.italic, defaultTextFormat.underline, defaultTextFormat.url, defaultTextFormat.target, defaultTextFormat.align);
+		var dtf:TextFormat = textField.defaultTextFormat;
+		return new TextFormat(dtf.font, dtf.size, dtf.color, dtf.bold, dtf.italic, dtf.underline, dtf.url, dtf.target, dtf.align);
 	}
 	
-	/**
-	 * Method for converting string to TextFormatAlign
-	 */
-	#if (flash || js)
-	private function convertTextAlignmentFromString(StrAlign:FlxTextAlign):TextFormatAlign
-	#else
-	private function convertTextAlignmentFromString(StrAlign:FlxTextAlign):String
-	#end
+	private inline function updateDefaultFormat():Void
 	{
-		return switch (StrAlign)
-		{
-			case LEFT:
-				TextFormatAlign.LEFT;
-			case CENTER:
-				TextFormatAlign.CENTER;
-			case RIGHT:
-				TextFormatAlign.RIGHT;
-			case JUSTIFY:
-				TextFormatAlign.JUSTIFY;
-		}
+		textField.defaultTextFormat = _defaultFormat;
+		textField.setTextFormat(_defaultFormat);
+		_regen = true;
 	}
 	
-	private inline function updateFormat(Format:TextFormat):Void
+	override function set_frames(Frames:FlxFramesCollection):FlxFramesCollection 
 	{
-		#if !flash
-		_textField.setTextFormat(Format, 0, _textField.text.length);
-		#else
-		_textField.setTextFormat(Format);
-		#end
+		super.set_frames(Frames);
+		_regen = false;
+		return Frames;
 	}
 }
 
-class FlxTextFormat implements IFlxDestroyable
+@:allow(flixel.text.FlxText.applyFormats)
+class FlxTextFormat
 {
 	/**
-	 * The border color if FlxText has a shadow or a border
+	 * The border color if the text has a shadow or a border
 	 */
-	public var borderColor:FlxColor;
+	private var borderColor:FlxColor;
+	private var format(default, null):TextFormat;
 	
 	/**
-	 * The start index of the string where the format will be applied
+	 * @param   FontColor     Font color, in `0xRRGGBB` format. Inherits from the default format by default.
+	 * @param   Bold          Whether the text should be bold (must be supported by the font). `false` by default.
+	 * @param   Italic        Whether the text should be in italics (must be supported by the font). Only works on Flash. `false` by default.  
+	 * @param   BorderColor   Border color, in `0xAARRGGBB` format. By default, no border (`null` / transparent).
 	 */
-	public var start:Int = -1;
-	/**
-	 * The end index of the string where the format will be applied
-	 */
-	public var end:Int = -1;
-	
-	/**
-	 * Internal TextFormat
-	 */
-	public var format(default, null):TextFormat;
-	
-	/**
-	 * @param	FontColor	(Optional) Set the font  color. By default, inherits from the default format.
-	 * @param	Bold		(Optional) Set the font to bold. The font must support bold. By default, false. 
-	 * @param	Italic		(Optional) Set the font to italics. The font must support italics. Only works in openfl. By default, false.  
-	 * @param	BorderColor	(Optional) Set the border color. By default, no border (null).
-	 * @param	Start		(Default=-1) The start index of the string where the format will be applied. If not set, the format won't be applied.
-	 * @param	End			(Default=-1) The end index of the string where the format will be applied.
-	 */
-	public function new(?FontColor:FlxColor, ?Bold:Bool, ?Italic:Bool, ?BorderColor:FlxColor, ?Start:Int = -1, ?End:Int = -1)
+	public function new(?FontColor:FlxColor, ?Bold:Bool, ?Italic:Bool, ?BorderColor:FlxColor)
 	{
-		if (FontColor != null)
-		{
-			FontColor &= 0x00ffffff;
-		}
-		if (BorderColor != null)
-		{
-			BorderColor &= 0x00ffffff;
-		}
 		format = new TextFormat(null, null, FontColor, Bold, Italic);
-		
-		if (Start > -1)
-		{
-			start = Start;
-		}
-		if (End > -1)
-		{
-			end = End;
-		}
-		
 		borderColor = BorderColor == null ? FlxColor.TRANSPARENT : BorderColor;
 	}
+}
+
+private class FlxTextFormatRange
+{
+	public var range(default, null):FlxRange<Int>;
+	public var format(default, null):FlxTextFormat;
 	
-	public function destroy():Void
+	public function new(format:FlxTextFormat, start:Int, end:Int)
 	{
-		format = null;
+		range = new FlxRange<Int>(start, end);
+		this.format = format;
+	}
+}
+
+class FlxTextFormatMarkerPair
+{
+	public var format:FlxTextFormat;
+	public var marker:String;
+	
+	public function new(format:FlxTextFormat, marker:String)
+	{
+		this.format = format;
+		this.marker = marker;
 	}
 }
 
@@ -1012,7 +1090,8 @@ enum FlxTextBorderStyle
 {
 	NONE;
 	/**
-	 * A simple shadow to the lower-right
+	 * A simple shadow to the lower-right.
+	 * Use `FlxText.shadowOffset` for custom placement.
 	 */
 	SHADOW;
 	/**
@@ -1020,7 +1099,7 @@ enum FlxTextBorderStyle
 	 */
 	OUTLINE;
 	/**
-	 * Outline, optimized using only 4 draw calls. (Might not work for narrow and/or 1-pixel fonts)
+	 * Outline, optimized using only 4 draw calls (might not work for narrow and/or 1-pixel fonts)
 	 */
 	OUTLINE_FAST;
 }
@@ -1029,7 +1108,41 @@ enum FlxTextBorderStyle
 abstract FlxTextAlign(String) from String
 {
 	var LEFT = "left";
+	
+	/**
+	 * Warning: on Flash, this can have a negative impact on performance
+	 * of multiline texts that are frequently regenerated (especially with
+	 * `borderStyle == OUTLINE`) due to a workaround for blurry rendering.
+	 */
 	var CENTER = "center";
+	
 	var RIGHT = "right";
+	
 	var JUSTIFY = "justify";
+	
+	public static function fromOpenFL(align:AlignType):FlxTextAlign
+	{
+		return switch (align)
+		{
+			case TextFormatAlign.LEFT: LEFT;
+			case TextFormatAlign.CENTER: CENTER;
+			case TextFormatAlign.RIGHT: RIGHT;
+			case TextFormatAlign.JUSTIFY: JUSTIFY;
+			default: LEFT;
+		}
+	}
+	
+	public static function toOpenFL(align:FlxTextAlign):AlignType
+	{
+		return switch (align)
+		{
+			case LEFT: TextFormatAlign.LEFT;
+			case CENTER: TextFormatAlign.CENTER;
+			case RIGHT: TextFormatAlign.RIGHT;
+			case JUSTIFY: TextFormatAlign.JUSTIFY;
+			default: TextFormatAlign.LEFT;
+		}
+	}
 }
+
+private typedef AlignType = #if openfl_legacy String #else TextFormatAlign #end ;

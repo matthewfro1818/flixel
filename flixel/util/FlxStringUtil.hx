@@ -1,14 +1,15 @@
 package flixel.util;
 
-import openfl.display.BitmapData;
-import openfl.geom.Matrix;
-import openfl.Lib;
-import openfl.net.URLRequest;
+import flash.display.BitmapData;
 import flixel.FlxG;
 import flixel.math.FlxMath;
 import flixel.system.FlxAssets;
 import flixel.util.FlxDestroyUtil.IFlxDestroyable;
 using StringTools;
+
+#if flash
+import flash.geom.Matrix;
+#end
 
 /**
  * A class primarily containing functions related 
@@ -36,7 +37,7 @@ class FlxStringUtil
 	 * @param	ShowMS		Whether to show milliseconds after a "." as well.  Default value is false.
 	 * @return	A nicely formatted String, like "1:03".
 	 */
-	public static inline function formatTime(Seconds:Float, ShowMS:Bool = false):String
+	public static function formatTime(Seconds:Float, ShowMS:Bool = false):String
 	{
 		var timeString:String = Std.int(Seconds / 60) + ":";
 		var timeStringHelper:Int = Std.int(Seconds) % 60;
@@ -66,7 +67,7 @@ class FlxStringUtil
 	 * @param	AnyArray	Any Array object.
 	 * @return	A comma-separated String containing the .toString() output of each element in the array.
 	 */
-	public static inline function formatArray(AnyArray:Array<Dynamic>):String
+	public static function formatArray(AnyArray:Array<Dynamic>):String
 	{
 		var string:String = "";
 		if ((AnyArray != null) && (AnyArray.length > 0))
@@ -82,16 +83,17 @@ class FlxStringUtil
 		return string;
 	}
 
-	 /**
-	 * Generate a comma-seperated string representation of the keys of a StringMap.
+	/**
+	 * Generate a comma-separated string representation of the keys of a StringMap.
 	 * 
 	 * @param  AnyMap    A StringMap object.
 	 * @return  A String formatted like this: key1, key2, ..., keyX
 	 */
-	public static inline function formatStringMap(AnyMap:Map<String,Dynamic>):String
+	public static function formatStringMap(AnyMap:Map<String, Dynamic>):String
 	{
 		var string:String = "";
-		for (key in AnyMap.keys()) {
+		for (key in AnyMap.keys())
+		{
 			string += Std.string(key);
 			string += ", ";
 		}
@@ -102,59 +104,54 @@ class FlxStringUtil
 	/**
 	 * Automatically commas and decimals in the right places for displaying money amounts.
 	 * Does not include a dollar sign or anything, so doesn't really do much
-	 * if you call say var results:String = FlxString.formatMoney(10,false);
+	 * if you call say `FlxString.formatMoney(10, false)`.
 	 * However, very handy for displaying large sums or decimal money values.
 	 * 
 	 * @param	Amount			How much moneys (in dollars, or the equivalent "main" currency - i.e. not cents).
-	 * @param	ShowDecimal		Whether to show the decimals/cents component. Default value is true.
-	 * @param	EnglishStyle	Major quantities (thousands, millions, etc) separated by commas, and decimal by a period.  Default value is true.
-	 * @return	A nicely formatted String.  Does not include a dollar sign or anything!
+	 * @param	ShowDecimal		Whether to show the decimals/cents component.
+	 * @param	EnglishStyle	Major quantities (thousands, millions, etc) separated by commas, and decimal by a period.
+	 * @return	A nicely formatted String. Does not include a dollar sign or anything!
 	 */
-	public static inline function formatMoney(Amount:Float, ShowDecimal:Bool = true, EnglishStyle:Bool = true):String
+	public static function formatMoney(Amount:Float, ShowDecimal:Bool = true, EnglishStyle:Bool = true):String
 	{
-		var helper:Int;
-		var amount:Int = Math.floor(Amount);
+		var isNegative = Amount < 0;
+		Amount = Math.abs(Amount);
+
 		var string:String = "";
 		var comma:String = "";
-		var zeroes:String = "";
+		var amount:Int = Math.floor(Amount);
 		while (amount > 0)
 		{
-			if ((string.length > 0) && (comma.length <= 0))
-			{
-				if (EnglishStyle)
-				{
-					comma = ",";
-				}
-				else
-				{
-					comma = ".";
-				}
-			}
-			zeroes = "";
-			helper = amount - Math.floor(amount / 1000) * 1000;
+			if (string.length > 0 && comma.length <= 0)
+				comma = (EnglishStyle ? "," : ".");
+
+			var zeroes = "";
+			var helper = amount - Math.floor(amount / 1000) * 1000;
 			amount = Math.floor(amount / 1000);
 			if (amount > 0)
 			{
 				if (helper < 100)
-				{
 					zeroes += "0";
-				}
 				if (helper < 10)
-				{
 					zeroes += "0";
-				}
 			}
 			string = zeroes + helper + comma + string;
 		}
+		
+		if (string == "")
+			string = "0";
+		
 		if (ShowDecimal)
 		{
-			amount = Std.int(Amount * 100) - (Std.int(Amount) * 100);
-			string += (EnglishStyle ? "." : ",") + amount;
+			amount = Math.floor(Amount * 100) - (Math.floor(Amount) * 100);
+			string += (EnglishStyle ? "." : ",");
 			if (amount < 10)
-			{
 				string += "0";
-			}
+			string += amount;
 		}
+		
+		if (isNegative)
+			string = "-" + string;
 		return string;
 	}
 	
@@ -183,9 +180,11 @@ class FlxStringUtil
 	public static function filterDigits(Input:String):String
 	{
 		var output = new StringBuf();
-		for (i in 0...Input.length) {
+		for (i in 0...Input.length)
+		{
 			var c = Input.charCodeAt(i);
-			if (c >= '0'.code && c <= '9'.code) {
+			if (c >= '0'.code && c <= '9'.code)
+			{
 				output.addChar(c);
 			}
 		}
@@ -235,8 +234,7 @@ class FlxStringUtil
 	 * @param	Simple	Returns only the class name, not the package or packages.
 	 * @return	The name of the Class as a String object.
 	 */
-	@:extern
-	public static inline function getClassName(Obj:Dynamic, Simple:Bool = false):String
+	public static function getClassName(Obj:Dynamic, Simple:Bool = false):String
 	{
 		var cl:Class<Dynamic>;
 		if (Std.is(Obj, Class))
@@ -251,7 +249,7 @@ class FlxStringUtil
 		var s:String = Type.getClassName(cl);
 		if (s != null)
 		{
-			s = StringTools.replace(s, "::", ".");
+			s = s.replace("::", ".");
 			if (Simple)
 			{
 				s = s.substr(s.lastIndexOf(".") + 1);
@@ -265,14 +263,8 @@ class FlxStringUtil
 	 */
 	public static function getDomain(url:String):String
 	{
-		var urlStart:Int = url.indexOf("://") + 3;
-		var urlEnd:Int = url.indexOf("/", urlStart);
-		var home:String = url.substring(urlStart, urlEnd);
-		var LastDot:Int = home.lastIndexOf(".") - 1;
-		var domEnd:Int = home.lastIndexOf(".", LastDot) + 1;
-		home = home.substring(domEnd, home.length);
-		home = home.split(":")[0];
-		return (home == "") ? "local" : home;
+		var regex:EReg = ~/(?:[a-z0-9.+-]+:\/\/)(?:[a-z0-9-]+\.)*([a-z0-9-]+\.[a-z0-9-]+)/i;
+		return regex.match(url) ? regex.matched(1).toLowerCase() : "local";
 	}
 	
 	/**
@@ -287,7 +279,6 @@ class FlxStringUtil
 	{
 		return (getClassName(Obj1, Simple) == getClassName(Obj2, Simple));
 	}
-	
 	
 	/**
 	 * Split a comma-separated string into an array of ints
@@ -344,11 +335,11 @@ class FlxStringUtil
 		var row:Int = 0;
 		var column:Int;
 		var csv:String = "";
-		var Height:Int = Std.int(Data.length / Width);
+		var height:Int = Std.int(Data.length / Width);
 		var index:Int;
 		var offset:Int = 0;
 		
-		while (row < Height)
+		while (row < height)
 		{
 			column = 0;
 			
@@ -381,7 +372,7 @@ class FlxStringUtil
 				}
 				else
 				{
-					csv += ", "+index;
+					csv += ", " + index;
 				}
 				
 				column++;
@@ -400,8 +391,8 @@ class FlxStringUtil
 	 * 
 	 * @param	Bitmap		A Flash BitmapData object, preferably black and white.
 	 * @param	Invert		Load white pixels as solid instead.
-	 * @param	Scale		Default is 1.  Scale of 2 means each pixel forms a 2x2 block of tiles, and so on.
-	 * @param  	ColorMap  	An array of color values (0xAARRGGBB) in the order they're intended to be assigned as indices
+	 * @param	Scale		Default is 1. Scale of 2 means each pixel forms a 2x2 block of tiles, and so on.
+	 * @param	ColorMap	An array of color values (alpha values are ignored) in the order they're intended to be assigned as indices
 	 * @return	A comma-separated string containing the level data in a FlxTilemap-friendly format.
 	 */
 	public static function bitmapToCSV(Bitmap:BitmapData, Invert:Bool = false, Scale:Int = 1, ?ColorMap:Array<FlxColor>):String
@@ -417,7 +408,7 @@ class FlxStringUtil
 			var bd:BitmapData = Bitmap;
 			Bitmap = new BitmapData(Bitmap.width * Scale, Bitmap.height * Scale);
 			
-			#if js
+			#if !flash
 			var bdW:Int = bd.width;
 			var bdH:Int = bd.height;
 			var pCol:Int = 0;
@@ -442,6 +433,14 @@ class FlxStringUtil
 			mtx.scale(Scale, Scale);
 			Bitmap.draw(bd, mtx);
 			#end
+		}
+		
+		if (ColorMap != null)
+		{
+			for (i in 0...ColorMap.length)
+			{
+				ColorMap[i] = ColorMap[i].to24Bit();
+			}
 		}
 		
 		// Walk image and export pixel values
@@ -507,9 +506,10 @@ class FlxStringUtil
 	 * @param	ImageFile	An embedded graphic, preferably black and white.
 	 * @param	Invert		Load white pixels as solid instead.
 	 * @param	Scale		Default is 1.  Scale of 2 means each pixel forms a 2x2 block of tiles, and so on.
+	 * @param	ColorMap	An array of color values (alpha values are ignored) in the order they're intended to be assigned as indices
 	 * @return	A comma-separated string containing the level data in a FlxTilemap-friendly format.
 	 */
-	public static function imageToCSV(ImageFile:Dynamic, Invert:Bool = false, Scale:Int = 1):String
+	public static function imageToCSV(ImageFile:Dynamic, Invert:Bool = false, Scale:Int = 1, ?ColorMap:Array<FlxColor>):String
 	{
 		var tempBitmapData:BitmapData;
 		
@@ -522,7 +522,7 @@ class FlxStringUtil
 			tempBitmapData = (Type.createInstance(ImageFile, [])).bitmapData;
 		}
 		
-		return bitmapToCSV(tempBitmapData, Invert, Scale);
+		return bitmapToCSV(tempBitmapData, Invert, Scale, ColorMap);
 	}
 	
 	/**
@@ -548,6 +548,49 @@ class FlxStringUtil
 		// remove the | of the last item, we don't want that at the end
 		output = output.substr(0, output.length - 2).trim();
 		return (output + ")");
+	}
+	
+	public static inline function contains(s:String, str:String):Bool
+	{
+		return s.indexOf(str) != -1;
+	}
+	
+	/**
+	 * Removes occurrences of a substring by calling `StringTools.replace(s, sub, "")`.
+	 */
+	public static inline function remove(s:String, sub:String):String
+	{
+		return s.replace(sub, "");
+	}
+	
+	/**
+	 * Inserts `insertion` into `s` at index `pos`.
+	 */
+	public static inline function insert(s:String, pos:Int, insertion:String):String
+	{
+		return s.substring(0, pos) + insertion + s.substr(pos);
+	}
+	
+	public static function sortAlphabetically(list:Array<String>):Array<String>
+	{
+		list.sort(function(a, b)
+		{
+			a = a.toLowerCase();
+			b = b.toLowerCase();
+			if (a < b) return -1;
+			if (a > b) return 1;
+			return 0;
+		});
+		return list;
+	}
+	
+	/**
+	 * Returns true if `s` equals `null` or is empty.
+	 * @since 4.1.0
+	 */
+	public static inline function isNullOrEmpty(s:String):Bool
+	{
+		return s == null || s.length == 0;
 	}
 }
 
@@ -580,6 +623,7 @@ class LabelValuePair implements IFlxDestroyable
 		label = null;
 		value = null;
 	}
-	
+
+	@:keep
 	private function new() {}
 }

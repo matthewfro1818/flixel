@@ -1,13 +1,13 @@
-﻿package flixel.tweens.motion;
+package flixel.tweens.motion;
 
-import flixel.tweens.FlxTween;
-import flixel.util.FlxArrayUtil;
-import flixel.util.FlxDestroyUtil;
 import flixel.math.FlxPoint;
+import flixel.tweens.FlxTween.FlxTweenManager;
+import flixel.tweens.FlxTween.TweenOptions;
+import flixel.util.FlxDestroyUtil;
 
 /**
  * A series of points which will determine a path from the
- * beginning point to the end poing using quadratic curves.
+ * beginning point to the end point using quadratic curves.
  */
 class QuadPath extends Motion
 {
@@ -28,9 +28,9 @@ class QuadPath extends Motion
 	private var _b:FlxPoint;
 	private var _c:FlxPoint;
 	
-	private function new(Options:TweenOptions)
+	private function new(Options:TweenOptions, ?manager:FlxTweenManager)
 	{
-		super(Options);
+		super(Options, manager);
 		
 		_points = [];
 		_curveT = [];
@@ -97,16 +97,16 @@ class QuadPath extends Motion
 		return _points[index % _points.length];
 	}
 	
-	override private function start():QuadPath
+	override public function start():QuadPath
 	{
 		_index = (backward) ? (_numSegs - 1) : 0; 
 		super.start();
 		return this;
 	}
 	
-	override private function update():Void
+	override private function update(elapsed:Float):Void
 	{
-		super.update();
+		super.update(elapsed);
 		var td:Float;
 		var tt:Float;
 		
@@ -147,7 +147,7 @@ class QuadPath extends Motion
 				}
 			}
 			
-			td = _curveT[_index+1];
+			td = _curveT[_index + 1];
 			tt = _curveT[_index] - td;
 			td = (scale - td) / tt;
 			_a = _points[_index * 2 + 2];
@@ -199,25 +199,26 @@ class QuadPath extends Motion
 	
 	private function getCurveLength(start:FlxPoint, control:FlxPoint, finish:FlxPoint):Float
 	{
-		var a = FlxPoint.get();
-		var b = FlxPoint.get();
+		var p1 = FlxPoint.get();
+		var p2 = FlxPoint.get();
 		
-		a.x = start.x - 2 * control.x + finish.x;
-		a.y = start.y - 2 * control.y + finish.y;
-		b.x = 2 * control.x - 2 * start.x;
-		b.y = 2 * control.y - 2 * start.y;
-		var A:Float = 4 * (a.x * a.x + a.y * a.y),
-			B:Float = 4 * (a.x * b.x + a.y * b.y),
-			C:Float = b.x * b.x + b.y * b.y,
-			ABC:Float = 2 * Math.sqrt(A + B + C),
-			A2:Float = Math.sqrt(A),
-			A32:Float = 2 * A * A2,
-			C2:Float = 2 * Math.sqrt(C),
-			BA:Float = B / A2;
+		p1.x = start.x - 2 * control.x + finish.x;
+		p1.y = start.y - 2 * control.y + finish.y;
+		p2.x = 2 * control.x - 2 * start.x;
+		p2.y = 2 * control.y - 2 * start.y;
+		var a:Float = 4 * (p1.x * p1.x + p1.y * p1.y),
+			b:Float = 4 * (p1.x * p2.x + p1.y * p2.y),
+			c:Float = p2.x * p2.x + p2.y * p2.y,
+			abc:Float = 2 * Math.sqrt(a + b + c),
+			a2:Float = Math.sqrt(a),
+			a32:Float = 2 * a * a2,
+			c2:Float = 2 * Math.sqrt(c),
+			ba:Float = b / a2;
 			
-		a.put();
-		b.put();
+		p1.put();
+		p2.put();
 			
-		return (A32 * ABC + A2 * B * (ABC - C2) + (4 * C * A - B * B) * Math.log((2 * A2 + BA + ABC) / (BA + C2))) / (4 * A32);
+		return (a32 * abc + a2 * b * (abc - c2) + (4 * c * a - b * b) *
+			Math.log((2 * a2 + ba + abc) / (ba + c2))) / (4 * a32);
 	}
 }

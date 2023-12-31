@@ -1,7 +1,4 @@
-﻿package flixel.tweens.motion;
-
-import flixel.tweens.FlxEase.EaseFunction;
-import flixel.tweens.FlxTween;
+package flixel.tweens.motion;
 
 /**
  * Determines motion along a cubic curve.
@@ -48,9 +45,9 @@ class CubicMotion extends Motion
 		return this;
 	}
 	
-	override private function update():Void
+	override private function update(elapsed:Float):Void
 	{
-		super.update();
+		super.update(elapsed);
 		x = scale * scale * scale * (_toX + 3 * (_aX - _bX) - _fromX) + 3 * scale * scale * (_fromX - 2 * _aX + _bX) + 3 * scale * (_aX - _fromX) + _fromX;
 		y = scale * scale * scale * (_toY + 3 * (_aY - _bY) - _fromY) + 3 * scale * scale * (_fromY - 2 * _aY + _bY) + 3 * scale * (_aY - _fromY) + _fromY;
 		if (finished)

@@ -1,4 +1,4 @@
-﻿package flixel.tweens.misc;
+package flixel.tweens.misc;
 
 import flixel.FlxSprite;
 import flixel.tweens.FlxTween;
@@ -47,9 +47,9 @@ class ColorTween extends FlxTween
 		return this;
 	}
 	
-	override private function update():Void
+	override private function update(elapsed:Float):Void
 	{
-		super.update();
+		super.update(elapsed);
 		color = FlxColor.interpolate(startColor, endColor, scale);
 		
 		if (sprite != null)

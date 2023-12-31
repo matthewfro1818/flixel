@@ -1,7 +1,4 @@
-﻿package flixel.tweens.motion;
-
-import flixel.tweens.FlxEase.EaseFunction;
-import flixel.tweens.FlxTween;
+package flixel.tweens.motion;
 
 /**
  * Determines motion along a line, from one point to another.
@@ -52,14 +49,14 @@ class LinearMotion extends Motion
 		return this;
 	}
 
-	override private function update():Void
+	override private function update(elapsed:Float):Void
 	{
-		super.update();
+		super.update(elapsed);
 		x = _fromX + _moveX * scale;
 		y = _fromY + _moveY * scale;
 		
 		if ((x == (_fromX + _moveX)) && (y == (_fromY + _moveY)) 
-		    && active && (_secondsSinceStart >= duration))
+			&& active && (_secondsSinceStart >= duration))
 		{
 			finished = true;
 		}
@@ -71,7 +68,8 @@ class LinearMotion extends Motion
 
 	private function get_distance():Float
 	{
-		if (_distance >= 0) return _distance;
-		return (_distance = Math.sqrt(_moveX * _moveX + _moveY * _moveY));
+		if (_distance >= 0)
+			return _distance;
+		return _distance = Math.sqrt(_moveX * _moveX + _moveY * _moveY);
 	}
 }

@@ -1,9 +1,9 @@
 package flixel.tweens.motion;
 
-import flixel.tweens.FlxTween.TweenOptions;
-import flixel.util.FlxArrayUtil;
-import flixel.util.FlxDestroyUtil;
 import flixel.math.FlxPoint;
+import flixel.tweens.FlxTween.FlxTweenManager;
+import flixel.tweens.FlxTween.TweenOptions;
+import flixel.util.FlxDestroyUtil;
 
 /**
  * Determines linear motion along a set of points.
@@ -28,9 +28,9 @@ class LinearPath extends Motion
 	private var _prevPoint:FlxPoint;
 	private var _nextPoint:FlxPoint;
 	
-	private function new(Options:TweenOptions)
+	private function new(Options:TweenOptions, ?manager:FlxTweenManager)
 	{
-		super(Options);
+		super(Options, manager);
 		
 		points = [];
 		_pointD = [0];
@@ -95,16 +95,16 @@ class LinearPath extends Motion
 		return points[index % points.length];
 	}
 
-	override private function start():LinearPath
+	override public function start():LinearPath
 	{
 		_index = (backward) ? (points.length - 1) : 0;
 		super.start();
 		return this;
 	}
 
-	override private function update():Void
+	override private function update(elapsed:Float):Void
 	{
-		super.update();
+		super.update(elapsed);
 		var td:Float;
 		var	tt:Float;
 		

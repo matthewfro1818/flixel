@@ -1,32 +1,25 @@
 package flixel.util;
 
-import openfl.errors.Error;
-import openfl.net.SharedObject;
-import openfl.net.SharedObjectFlushStatus;
-
-#if flash
-import openfl.events.NetStatusEvent;
-#end
+import flash.errors.Error;
+import flash.net.SharedObject;
+import flash.net.SharedObjectFlushStatus;
+import flixel.util.FlxDestroyUtil.IFlxDestroyable;
 
 /**
  * A class to help automate and simplify save game functionality.
- * Basicaly a wrapper for the Flash SharedObject thing, but
+ * Basically a wrapper for the Flash SharedObject thing, but
  * handles some annoying storage request stuff too.
  */
-class FlxSave
+class FlxSave implements IFlxDestroyable
 {
-	private static var SUCCESS:Int = 0;
-	private static var PENDING:Int = 1;
-	private static var ERROR:Int = 2;
-	
 	/**
 	 * Allows you to directly access the data container in the local shared object.
 	 */
-	public var data:Dynamic;
+	public var data(default, null):Dynamic;
 	/**
 	 * The name of the local shared object.
 	 */
-	public var name:String;
+	public var name(default, null):String;
 	/**
 	 * The local shared object itself.
 	 */
@@ -39,15 +32,9 @@ class FlxSave
 	/**
 	 * Internal tracker for save object close request.
 	 */
-	private var _closeRequested:Bool;
+	private var _closeRequested:Bool = false;
 	
-	/**
-	 * Blanks out the containers.
-	 */
-	public function new()
-	{
-		destroy();
-	}
+	public function new() {}
 
 	/**
 	 * Clean up memory.
@@ -65,6 +52,7 @@ class FlxSave
 	 * Automatically creates or reconnects to locally saved data.
 	 * 
 	 * @param	Name	The name of the object (should be the same each time to access old data).
+	 * 					May not contain spaces or any of the following characters: `~ % & \ ; : " ' , < > ? #`
 	 * @return	Whether or not you successfully connected to the save data.
 	 */
 	public function bind(Name:String):Bool
@@ -75,7 +63,7 @@ class FlxSave
 		{
 			_sharedObject = SharedObject.getLocal(name);
 		}
-		catch(e:Error)
+		catch (e:Error)
 		{
 			FlxG.log.error("There was a problem binding to\nthe shared object data from FlxSave.");
 			destroy();
@@ -101,11 +89,11 @@ class FlxSave
 	}
 
 	/**
-	 * Writes the local shared object to disk immediately.  Leaves the object open in memory.
+	 * Writes the local shared object to disk immediately. Leaves the object open in memory.
 	 * 
 	 * @param	MinFileSize		If you need X amount of space for your save, specify it here.
 	 * @param	OnComplete		This callback will be triggered when the data is written successfully.
-	 * @return	Whether or not the data was written immediately.  False could be an error OR a storage request popup.
+	 * @return	Whether or not the data was written immediately. False could be an error OR a storage request popup.
 	 */
 	public function flush(MinFileSize:Int = 0, ?OnComplete:Bool->Void):Bool
 	{
@@ -114,35 +102,17 @@ class FlxSave
 			return false;
 		}
 		_onComplete = OnComplete;
-		#if flash
-		var result:String = null;
-		#else
-		var result:SharedObjectFlushStatus;
-		#end
-		try 
+		var result = null;
+		try
 		{ 
-			#if !js
-			result = _sharedObject.flush(MinFileSize); 
-			#else
-			result = _sharedObject.flush(); 
-			#end
+			result = _sharedObject.flush();
 		}
-		catch (e:Error) { return onDone(ERROR); }
-		#if flash
-		if (result == "pending")
-		#else
-		if (result == SharedObjectFlushStatus.PENDING)
-		#end
+		catch (_:Error)
 		{
-			#if flash
-			_sharedObject.addEventListener(NetStatusEvent.NET_STATUS, onFlushStatus);
-			#end
+			return onDone(ERROR);
 		}
-		#if flash
-		return onDone((result == "flushed") ? SUCCESS : PENDING);
-		#else
-		return onDone((result == SharedObjectFlushStatus.FLUSHED) ? SUCCESS : PENDING);
-		#end
+
+		return onDone(result == SharedObjectFlushStatus.FLUSHED ? SUCCESS : PENDING);
 	}
 	
 	/**
@@ -159,19 +129,9 @@ class FlxSave
 			return false;
 		}
 		_sharedObject.clear();
+		data = {};
 		return true;
 	}
-	
-	/**
-	 * Event handler for special case storage requests.
-	 */
-	#if flash
-	private function onFlushStatus(E:NetStatusEvent):Void
-	{
-		_sharedObject.removeEventListener(NetStatusEvent.NET_STATUS, onFlushStatus);
-		onDone((E.info.code == "SharedObject.Flush.Success")?SUCCESS:ERROR);
-	}
-	#end
 	
 	/**
 	 * Event handler for special case storage requests.
@@ -180,24 +140,23 @@ class FlxSave
 	 * @param	Result		One of the result codes (PENDING, ERROR, or SUCCESS).
 	 * @return	Whether the operation was a success or not.
 	 */
-	private function onDone(Result:Int):Bool
+	private function onDone(Result:FlxSaveStatus):Bool
 	{
-		switch(Result)
+		switch (Result)
 		{
-			case FlxSave.PENDING:
+			case FlxSaveStatus.PENDING:
 				FlxG.log.warn("FlxSave is requesting extra storage space.");
-			case FlxSave.ERROR:
+			case FlxSaveStatus.ERROR:
 				FlxG.log.error("There was a problem flushing\nthe shared object data from FlxSave.");
-			//default:
+			default:
 		}
+		
 		if (_onComplete != null)
-		{
 			_onComplete(Result == SUCCESS);
-		}
+			
 		if (_closeRequested)
-		{
-			destroy();			
-		}
+			destroy();
+			
 		return Result == SUCCESS;
 	}
 	
@@ -215,4 +174,11 @@ class FlxSave
 		}
 		return true;
 	}
+}
+
+enum FlxSaveStatus
+{
+	SUCCESS;
+	PENDING;
+	ERROR;
 }

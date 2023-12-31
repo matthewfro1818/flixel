@@ -1,18 +1,24 @@
 package flixel.ui;
 
-import openfl.display.BitmapData;
-import openfl.events.MouseEvent;
+import flash.events.MouseEvent;
+import flixel.FlxCamera;
 import flixel.FlxG;
 import flixel.FlxSprite;
+import flixel.graphics.atlas.FlxAtlas;
+import flixel.graphics.atlas.FlxNode;
+import flixel.graphics.frames.FlxTileFrames;
 import flixel.input.FlxInput;
-import flixel.input.touch.FlxTouch;
+import flixel.input.FlxPointer;
+import flixel.input.IFlxInput;
+import flixel.input.mouse.FlxMouseButton;
 import flixel.math.FlxPoint;
 import flixel.system.FlxSound;
 import flixel.text.FlxText;
 import flixel.util.FlxDestroyUtil;
 
-@:bitmap("assets/images/ui/button.png")
-class GraphicButton extends BitmapData {}
+#if FLX_TOUCH
+import flixel.input.touch.FlxTouch;
+#end
 
 /**
  * A simple button class that calls a function when clicked by the mouse.
@@ -38,22 +44,20 @@ class FlxButton extends FlxTypedButton<FlxText>
 	public var text(get, set):String;
 	
 	/**
-	 * Creates a new FlxButton object with a gray background
+	 * Creates a new `FlxButton` object with a gray background
 	 * and a callback function on the UI thread.
 	 * 
-	 * @param   X          The x position of the button.
-	 * @param   Y          The y position of the button.
-	 * @param   Text       The text that you want to appear on the button.
-	 * @param   OnClick    The function to call whenever the button is clicked.
+	 * @param   X         The x position of the button.
+	 * @param   Y         The y position of the button.
+	 * @param   Text      The text that you want to appear on the button.
+	 * @param   OnClick   The function to call whenever the button is clicked.
 	 */
 	public function new(X:Float = 0, Y:Float = 0, ?Text:String, ?OnClick:Void->Void)
 	{
 		super(X, Y, OnClick);
 		
 		for (point in labelOffsets)
-		{
 			point.set(point.x - 1, point.y + 3);
-		}
 		
 		initLabel(Text);
 	}
@@ -74,37 +78,53 @@ class FlxButton extends FlxTypedButton<FlxText>
 	
 	private inline function initLabel(Text:String):Void 
 	{
-		label = new FlxText(x + labelOffsets[NORMAL].x, y + labelOffsets[NORMAL].y, 80, Text);
-		label.setFormat(null, 8, 0x333333, "center");
-		label.alpha = labelAlphas[status];
+		if (Text != null)
+		{
+			label = new FlxText(x + labelOffsets[NORMAL].x, y + labelOffsets[NORMAL].y, 80, Text);
+			label.setFormat(null, 8, 0x333333, "center");
+			label.alpha = labelAlphas[status];
+			label.drawFrame(true);
+		}
 	}
 	
 	private inline function get_text():String 
 	{
-		return label.text;
+		return (label != null) ? label.text : null;
 	}
 	
 	private inline function set_text(Text:String):String 
 	{
-		return label.text = Text;
+		if (label == null)
+		{
+			initLabel(Text);
+		}
+		else
+		{
+			label.text = Text;
+		}
+		return Text;
 	}
 }
 
 /**
  * A simple button class that calls a function when clicked by the mouse.
  */
-class FlxTypedButton<T:FlxSprite> extends FlxSprite
+#if !display
+@:generic
+#end
+class FlxTypedButton<T:FlxSprite> extends FlxSprite implements IFlxInput
 {
 	/**
-	 * The label that appears on the button. Can be any FlxSprite.
+	 * The label that appears on the button. Can be any `FlxSprite`.
 	 */
 	public var label(default, set):T;
 	/**
-	 * What offsets the label should have for each status.
+	 * What offsets the `label` should have for each status.
 	 */
 	public var labelOffsets:Array<FlxPoint> = [FlxPoint.get(), FlxPoint.get(), FlxPoint.get(0, 1)];
 	/**
-	 * What alpha value the label should have for each status. Default is [0.8, 1.0, 0.5].
+	 * What alpha value the label should have for each status. Default is `[0.8, 1.0, 0.5]`.
+	 * Multiplied with the button's `alpha`.
 	 */
 	public var labelAlphas:Array<Float> = [0.8, 1.0, 0.5];
 	/**
@@ -117,25 +137,37 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite
 	 * If false, the input has to be pressed while hovering over the button.
 	 */
 	public var allowSwiping:Bool = true;
+#if FLX_MOUSE
 	/**
-	 * Shows the current state of the button, either FlxButton.NORMAL, 
-	 * FlxButton.HIGHLIGHT or FlxButton.PRESSED.
+	 * Which mouse buttons can trigger the button - by default only the left mouse button.
+	 */
+	public var mouseButtons:Array<FlxMouseButtonID> = [FlxMouseButtonID.LEFT];
+#end
+	/**
+	 * Maximum distance a pointer can move to still trigger event handlers.
+	 * If it moves beyond this limit, onOut is triggered.
+	 * Defaults to `Math.POSITIVE_INFINITY` (i.e. no limit).
+	 */
+	public var maxInputMovement:Float = Math.POSITIVE_INFINITY;
+	/**
+	 * Shows the current state of the button, either `FlxButton.NORMAL`,
+	 * `FlxButton.HIGHLIGHT` or `FlxButton.PRESSED`.
 	 */
 	public var status(default, set):Int;
 	/**
-	 * The properties of this button's onUp event (callback function, sound).
+	 * The properties of this button's `onUp` event (callback function, sound).
 	 */
 	public var onUp(default, null):FlxButtonEvent;
 	/**
-	 * The properties of this button's onDown event (callback function, sound).
+	 * The properties of this button's `onDown` event (callback function, sound).
 	 */
 	public var onDown(default, null):FlxButtonEvent;
 	/**
-	 * The properties of this button's onOver event (callback function, sound).
+	 * The properties of this button's `onOver` event (callback function, sound).
 	 */
 	public var onOver(default, null):FlxButtonEvent;
 	/**
-	 * The properties of this button's onOut event (callback function, sound).
+	 * The properties of this button's `onOut` event (callback function, sound).
 	 */
 	public var onOut(default, null):FlxButtonEvent;
 	
@@ -144,30 +176,35 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite
 	public var pressed(get, never):Bool;
 	public var justPressed(get, never):Bool;
 	
-	// we don't need an ID here, so let's just use Int as the type
+	/**
+	 * We cast label to a `FlxSprite` for internal operations to avoid Dynamic casts in C++
+	 */
+	private var _spriteLabel:FlxSprite;
+	
+	/** 
+	 * We don't need an ID here, so let's just use `Int` as the type.
+	 */
 	private var input:FlxInput<Int>;
 	
 	/**
-	 * The touch currently pressing this button, if none, it's null. Needed to check for its release.
+	 * The input currently pressing this button, if none, it's `null`. Needed to check for its release.
 	 */
-	private var _pressedTouch:FlxTouch;
-	/**
-	 * Whether this button is currently being pressed by the mouse. Needed to check for its release.
-	 */
-	private var _pressedMouse:Bool = false;
+	private var currentInput:IFlxInput;
+
+	private var lastStatus = -1;
 	
 	/**
-	 * Creates a new FlxTypedButton object with a gray background.
+	 * Creates a new `FlxTypedButton` object with a gray background.
 	 * 
-	 * @param   X          The x position of the button.
-	 * @param   Y          The y position of the button.
-	 * @param   OnClick    The function to call whenever the button is clicked.
+	 * @param   X         The x position of the button.
+	 * @param   Y         The y position of the button.
+	 * @param   OnClick   The function to call whenever the button is clicked.
 	 */
 	public function new(X:Float = 0, Y:Float = 0, ?OnClick:Void->Void)
 	{
 		super(X, Y);
 		
-		loadGraphic(GraphicButton, true, 80, 20);
+		loadDefaultGraphic();
 		
 		onUp = new FlxButtonEvent(OnClick);
 		onDown = new FlxButtonEvent();
@@ -179,13 +216,13 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite
 		// Since this is a UI element, the default scrollFactor is (0, 0)
 		scrollFactor.set();
 		
-		#if !FLX_NO_MOUSE
-		FlxG.stage.addEventListener(MouseEvent.MOUSE_UP, onUpEventListener);
+		#if FLX_MOUSE
+			FlxG.stage.addEventListener(MouseEvent.MOUSE_UP, onUpEventListener);
 		#end
 		
 		#if FLX_NO_MOUSE // no need for highlight frame without mouse input
-		statusAnimations[FlxButton.HIGHLIGHT] = "normal";
-		labelAlphas[FlxButton.HIGHLIGHT] = 1;
+			statusAnimations[FlxButton.HIGHLIGHT] = "normal";
+			labelAlphas[FlxButton.HIGHLIGHT] = 1;
 		#end
 		
 		input = new FlxInput(0);
@@ -198,6 +235,11 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite
 		setupAnimation("normal", FlxButton.NORMAL);
 		setupAnimation("highlight", FlxButton.HIGHLIGHT);
 		setupAnimation("pressed", FlxButton.PRESSED);
+	}
+	
+	private function loadDefaultGraphic():Void
+	{
+		loadGraphic("flixel/images/ui/button.png", true, 80, 20);
 	}
 	
 	private function setupAnimation(animationName:String, frameIndex:Int):Void
@@ -213,6 +255,7 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite
 	override public function destroy():Void
 	{
 		label = FlxDestroyUtil.destroy(label);
+		_spriteLabel = null;
 		
 		onUp = FlxDestroyUtil.destroy(onUp);
 		onDown = FlxDestroyUtil.destroy(onDown);
@@ -222,11 +265,11 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite
 		labelOffsets = FlxDestroyUtil.putArray(labelOffsets);
 		
 		labelAlphas = null;
-		_pressedTouch = null;
+		currentInput = null;
 		input = null;
 		
-		#if !FLX_NO_MOUSE
-		FlxG.stage.removeEventListener(MouseEvent.MOUSE_UP, onUpEventListener);
+		#if FLX_MOUSE
+			FlxG.stage.removeEventListener(MouseEvent.MOUSE_UP, onUpEventListener);
 		#end
 		
 		super.destroy();
@@ -235,20 +278,25 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite
 	/**
 	 * Called by the game loop automatically, handles mouseover and click detection.
 	 */
-	override public function update():Void
+	override public function update(elapsed:Float):Void
 	{
-		super.update();
+		super.update(elapsed);
 		
 		input.update();
 		
 		if (visible) 
 		{
 			// Update the button, but only if at least either mouse or touches are enabled
-			#if (!FLX_NO_MOUSE || !FLX_NO_TOUCH)
-			updateButton();
+			#if FLX_POINTER_INPUT
+				updateButton();
 			#end
 			
-			updateStatusAnimation();
+			// Trigger the animation only if the button's input status changes. 
+			if (lastStatus != status) 
+			{
+				updateStatusAnimation();
+				lastStatus = status;
+			}
 		}
 	}
 	
@@ -260,18 +308,15 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite
 	/**
 	 * Just draws the button graphic and text label to the screen.
 	 */
-	override public function draw():Void
+	override public function drawTo(Camera:FlxCamera):Void 
 	{
-		super.draw();
+		super.drawTo(Camera);
 		
-		if (label != null && label.visible)
-		{
-			label.cameras = cameras;
-			label.draw();
-		}
+		if (_spriteLabel != null && _spriteLabel.visible)
+			_spriteLabel.drawTo(Camera);
 	}
 	
-	#if !FLX_NO_DEBUG
+#if FLX_DEBUG
 	/**
 	 * Helper function to draw the debug graphic for the label as well.
 	 */
@@ -279,111 +324,161 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite
 	{
 		super.drawDebug();
 		
-		if (label != null) 
-		{
-			label.drawDebug();
-		}
+		if (_spriteLabel != null) 
+			_spriteLabel.drawDebug();
 	}
-	#end
+#end
+
+	/**
+	 * Stamps button's graphic and label onto specified atlas object and loads graphic from this atlas.
+	 * This method assumes that you're using whole image for button's graphic and image has no spaces between frames.
+	 * And it assumes that label is a single frame sprite.
+	 * 
+	 * @param   atlas   Atlas to stamp graphic to.
+	 * @return  Whether the button's graphic and label's graphic were stamped on the atlas successfully.
+	 */
+	public function stampOnAtlas(atlas:FlxAtlas):Bool
+	{
+		var buttonNode:FlxNode = atlas.addNode(graphic.bitmap, graphic.key);
+		var result:Bool = (buttonNode != null);
+		
+		if (buttonNode != null)
+		{
+			var buttonFrames:FlxTileFrames = cast frames;
+			var tileSize:FlxPoint = FlxPoint.get(buttonFrames.tileSize.x, buttonFrames.tileSize.y);
+			var tileFrames:FlxTileFrames = buttonNode.getTileFrames(tileSize);
+			this.frames = tileFrames;
+		}
+		
+		if (result && label != null)
+		{
+			var labelNode:FlxNode = atlas.addNode(label.graphic.bitmap, label.graphic.key);
+			result = result && (labelNode != null);
+			
+			if (labelNode != null)
+				label.frames = labelNode.getImageFrame();
+		}
+		
+		return result;
+	}
 	
 	/**
 	 * Basic button update logic - searches for overlaps with touches and
-	 * the mouse cursor and calls updateStatus()
+	 * the mouse cursor and calls `updateStatus()`.
 	 */
 	private function updateButton():Void
 	{
 		// We're looking for any touch / mouse overlaps with this button
-		var overlapFound = false;
-		
-		// Have a look at all cameras
-		for (camera in cameras)
-		{
-			#if !FLX_NO_MOUSE
-			FlxG.mouse.getWorldPosition(camera, _point);
-			
-			if (overlapsPoint(_point, true, camera))
-			{
-				overlapFound = true;
-				updateStatus(true, FlxG.mouse.justPressed, FlxG.mouse.pressed);
-				break;
-			}
-			#end
-			
-			#if !FLX_NO_TOUCH
-			for (touch in FlxG.touches.list)
-			{
-				touch.getWorldPosition(camera, _point);
-				
-				if (overlapsPoint(_point, true, camera))
-				{
-					overlapFound = true;
-					updateStatus(true, touch.justPressed, touch.pressed, touch);
-					break;
-				}
-			}
-			#end
-		}
-		
+		var overlapFound = checkMouseOverlap();
 		if (!overlapFound)
-		{
-			updateStatus(false, false, false);
-		}
-	}
-	
-	/**
-	 * Updates the button status by calling the respective event handler function.
-	 * 
-	 * @param	Overlap			Whether there was any overlap with this button
-	 * @param	JustPressed		Whether the input (touch or mouse) was just pressed
-	 * @param	Pressed			Whether the input (touch or mouse) is pressed
-	 * @param	Touch			A FlxTouch, if this was called from an overlap with one
-	 */
-	private function updateStatus(Overlap:Bool, JustPressed:Bool, Pressed:Bool, ?Touch:FlxTouch):Void
-	{
-		if (Overlap)
-		{
-			if (JustPressed)
-			{
-				_pressedTouch = Touch;
-				if (Touch == null) 
-				{
-					_pressedMouse = true;
-				}
-				onDownHandler();
-			}
-			else if (status == FlxButton.NORMAL)
-			{
-				// Allow "swiping" to press a button (dragging it over the button while pressed)
-				if (allowSwiping && Pressed) 
-				{
-					onDownHandler();
-				}
-				else 
-				{
-					onOverHandler();
-				}
-			}
-		}
-		else if (status != FlxButton.NORMAL)
-		{
-			onOutHandler();
-		}
+			overlapFound = checkTouchOverlap();
 		
-		// onUp
-		#if !FLX_NO_TOUCH
-		if ((_pressedTouch != null) && _pressedTouch.justReleased)
+		#if FLX_TOUCH // there's only a mouse event listener for onUp
+		if (currentInput != null && currentInput.justReleased && Std.is(currentInput, FlxTouch) && overlapFound)
 		{
 			onUpHandler();
 		}
 		#end
+		
+		if (status != FlxButton.NORMAL &&
+			(!overlapFound || (currentInput != null && currentInput.justReleased)))
+		{
+			onOutHandler();
+		}
+	}
+	
+	private function checkMouseOverlap():Bool
+	{
+		#if FLX_MOUSE
+		for (camera in cameras)
+		{
+			for (buttonID in mouseButtons)
+			{
+				var button = FlxMouseButton.getByID(buttonID);
+				if (button != null && checkInput(FlxG.mouse, button, button.justPressedPosition, camera))
+				{
+					return true;
+				}
+			}
+		}
+		#end
+		
+		return false;
+	}
+	
+	private function checkTouchOverlap():Bool
+	{
+		#if FLX_TOUCH
+		for (camera in cameras)
+		{
+			for (touch in FlxG.touches.list)
+			{
+				if (checkInput(touch, touch, touch.justPressedPosition, camera))
+				{
+					return true;
+				}
+			}
+		}
+		#end
+		
+		return false;
+	}
+	
+	private function checkInput(pointer:FlxPointer, input:IFlxInput, justPressedPosition:FlxPoint, camera:FlxCamera):Bool
+	{
+		if (maxInputMovement != Math.POSITIVE_INFINITY &&
+			justPressedPosition.distanceTo(pointer.getScreenPosition(FlxPoint.weak())) > maxInputMovement &&
+			input == currentInput)
+		{
+			currentInput == null;
+		}
+		else if (overlapsPoint(pointer.getWorldPosition(camera, _point), true, camera))
+		{
+			updateStatus(input);
+			return true;
+		}
+		
+		return false;
+	}
+	
+	/**
+	 * Updates the button status by calling the respective event handler function.
+	 */
+	private function updateStatus(input:IFlxInput):Void
+	{
+		if (input.justPressed)
+		{
+			currentInput = input;
+			onDownHandler();
+		}
+		else if (status == FlxButton.NORMAL)
+		{
+			// Allow "swiping" to press a button (dragging it over the button while pressed)
+			if (allowSwiping && input.pressed)
+			{
+				onDownHandler();
+			}
+			else 
+			{
+				onOverHandler();
+			}
+		}
 	}
 	
 	private function updateLabelPosition()
 	{
-		if (label != null) // Label positioning
+		if (_spriteLabel != null) // Label positioning
 		{
-			label.x = x + labelOffsets[status].x;
-			label.y = y + labelOffsets[status].y;
+			_spriteLabel.x = (pixelPerfectPosition ? Math.floor(x) : x) + labelOffsets[status].x;
+			_spriteLabel.y = (pixelPerfectPosition ? Math.floor(y) : y) + labelOffsets[status].y;
+		}
+	}
+	
+	private function updateLabelAlpha()
+	{
+		if (_spriteLabel != null && labelAlphas.length > status) 
+		{
+			_spriteLabel.alpha = alpha * labelAlphas[status];
 		}
 	}
 	
@@ -391,15 +486,15 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite
 	 * Using an event listener is necessary for security reasons on flash - 
 	 * certain things like opening a new window are only allowed when they are user-initiated.
 	 */
-	#if !FLX_NO_MOUSE
+#if FLX_MOUSE
 	private function onUpEventListener(_):Void
 	{
-		if (visible && exists && active && (status == FlxButton.PRESSED))
+		if (visible && exists && active && status == FlxButton.PRESSED)
 		{
 			onUpHandler();
 		}
 	}
-	#end
+#end
 	
 	/**
 	 * Internal function that handles the onUp event.
@@ -408,8 +503,7 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite
 	{
 		status = FlxButton.NORMAL;
 		input.release();
-		_pressedMouse = false;
-		_pressedTouch = null;
+		currentInput = null;
 		// Order matters here, because onUp.fire() could cause a state change and destroy this object.
 		onUp.fire();
 	}
@@ -456,6 +550,8 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite
 		}
 		
 		label = Value;
+		_spriteLabel = label;
+		
 		updateLabelPosition();
 		
 		return Value;
@@ -463,11 +559,16 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite
 	
 	private function set_status(Value:Int):Int
 	{
-		if (label != null && labelAlphas.length > Value) 
-		{
-			label.alpha = alpha * labelAlphas[Value];
-		}
-		return status = Value;
+		status = Value;
+		updateLabelAlpha();
+		return status;
+	}
+	
+	override private function set_alpha(Value:Float):Float
+	{
+		super.set_alpha(Value);
+		updateLabelAlpha();
+		return alpha;
 	}
 	
 	override private function set_x(Value:Float):Float 
@@ -506,7 +607,7 @@ class FlxTypedButton<T:FlxSprite> extends FlxSprite
 }
 
 /** 
- * Helper function for FlxButton which handles its events.
+ * Helper function for `FlxButton` which handles its events.
  */ 
 private class FlxButtonEvent implements IFlxDestroyable
 {
@@ -515,23 +616,23 @@ private class FlxButtonEvent implements IFlxDestroyable
 	 */
 	public var callback:Void->Void;
 	
-	#if !FLX_NO_SOUND_SYSTEM
+#if FLX_SOUND_SYSTEM
 	/**
 	 * The sound to play when this event fires.
 	 */
 	public var sound:FlxSound;
-	#end
+#end
 	
 	/**
-	 * @param	Callback		The callback function to call when this even fires.
-	 * @param	sound			The sound to play when this event fires.
+	 * @param   Callback   The callback function to call when this even fires.
+	 * @param   sound      The sound to play when this event fires.
 	 */
 	public function new(?Callback:Void->Void, ?sound:FlxSound)
 	{
 		callback = Callback;
 		
-		#if !FLX_NO_SOUND_SYSTEM
-		this.sound = sound;
+		#if FLX_SOUND_SYSTEM
+			this.sound = sound;
 		#end
 	}
 	
@@ -542,8 +643,8 @@ private class FlxButtonEvent implements IFlxDestroyable
 	{
 		callback = null;
 		
-		#if !FLX_NO_SOUND_SYSTEM
-		sound = FlxDestroyUtil.destroy(sound);
+		#if FLX_SOUND_SYSTEM
+			sound = FlxDestroyUtil.destroy(sound);
 		#end
 	}
 	
@@ -553,15 +654,11 @@ private class FlxButtonEvent implements IFlxDestroyable
 	public inline function fire():Void
 	{
 		if (callback != null) 
-		{
 			callback();
-		}
 		
-		#if !FLX_NO_SOUND_SYSTEM
-		if (sound != null) 
-		{
+		#if FLX_SOUND_SYSTEM
+		if (sound != null)
 			sound.play(true);
-		}
 		#end
 	}
 }

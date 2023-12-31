@@ -1,11 +1,13 @@
 package flixel.util;
+
 import flixel.math.FlxMath;
+import flixel.system.macros.FlxMacroUtil;
 
 /**
  * Class representing a color, based on Int. Provides a variety of methods for creating and converting colors.
  * 
- * FlxColor's can be written as Ints. This means you can pass a hex value such as
- * 0xff123456 to a function expecting a FlxColor, and it will automatically become a FlxColor object.
+ * FlxColors can be written as Ints. This means you can pass a hex value such as
+ * 0xff123456 to a function expecting a FlxColor, and it will automatically become a FlxColor "object".
  * Similarly, FlxColors may be treated as Ints.
  * 
  * Note that when using properties of a FlxColor other than ARGB, the values are ultimately stored as
@@ -15,22 +17,29 @@ import flixel.math.FlxMath;
  */
 abstract FlxColor(Int) from Int from UInt to Int to UInt
 {
-	public static inline var TRANSPARENT:FlxColor =   0x00000000;
-	public static inline var WHITE:FlxColor =         0xFFFFFFFF;
-	public static inline var GRAY:FlxColor =          0xFF808080;
-	public static inline var BLACK:FlxColor =         0xFF000000;
+	public static inline var TRANSPARENT:FlxColor = 0x00000000;
+	public static inline var WHITE:FlxColor =       0xFFFFFFFF;
+	public static inline var GRAY:FlxColor =        0xFF808080;
+	public static inline var BLACK:FlxColor =       0xFF000000;
 	
-	public static inline var GREEN:FlxColor =         0xFF008000;
-	public static inline var LIME:FlxColor =          0xFF00FF00;
-	public static inline var YELLOW:FlxColor =        0xFFFFFF00;
-	public static inline var ORANGE:FlxColor =        0xFFFFA500;
-	public static inline var RED:FlxColor =           0xFFFF0000;
-	public static inline var PURPLE:FlxColor =        0xFF800080;
-	public static inline var BLUE:FlxColor =          0xFF0000FF;
-	public static inline var BROWN:FlxColor =         0xFF8B4513;
-	public static inline var PINK:FlxColor =          0xFFFFC0CB;
-	public static inline var MAGENTA:FlxColor =       0xFFFF00FF;
-	public static inline var CYAN:FlxColor =          0xFF00FFFF;
+	public static inline var GREEN:FlxColor =       0xFF008000;
+	public static inline var LIME:FlxColor =        0xFF00FF00;
+	public static inline var YELLOW:FlxColor =      0xFFFFFF00;
+	public static inline var ORANGE:FlxColor =      0xFFFFA500;
+	public static inline var RED:FlxColor =         0xFFFF0000;
+	public static inline var PURPLE:FlxColor =      0xFF800080;
+	public static inline var BLUE:FlxColor =        0xFF0000FF;
+	public static inline var BROWN:FlxColor =       0xFF8B4513;
+	public static inline var PINK:FlxColor =        0xFFFFC0CB;
+	public static inline var MAGENTA:FlxColor =     0xFFFF00FF;
+	public static inline var CYAN:FlxColor =        0xFF00FFFF;
+	
+	/**
+	 * A `Map<String, Int>` whose values are the static colors of `FlxColor`.
+	 * You can add more colors for `FlxColor.fromString(String)` if you need.
+	 */
+	public static var colorLookup(default, null):Map<String, Int>
+		= FlxMacroUtil.buildMap("flixel.util.FlxColor");
 	
 	public var red(get, set):Int;
 	public var blue(get, set):Int;
@@ -64,8 +73,10 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	 */
 	public var lightness(get, set):Float;
 	
+	private static var COLOR_REGEX = ~/^(0x|#)(([A-F0-9]{2}){3,4})$/i;
+	
 	/**
-	 * Create a color from the lest significant four bytes of an Int
+	 * Create a color from the least significant four bytes of an Int
 	 * 
 	 * @param	Value And Int with bytes in the format 0xAARRGGBB
 	 * @return	The color as a FlxColor
@@ -152,6 +163,51 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	}
 	
 	/**
+	 * Parses a `String` and returns a `FlxColor` or `null` if the `String` couldn't be parsed.
+	 * 
+	 * Examples (input -> output in hex):
+	 * 
+	 * - `0x00FF00`    -> `0xFF00FF00`
+	 * - `0xAA4578C2`  -> `0xAA4578C2`
+	 * - `#0000FF`     -> `0xFF0000FF`
+	 * - `#3F000011`   -> `0x3F000011`
+	 * - `GRAY`        -> `0xFF808080`
+	 * - `blue`        -> `0xFF0000FF`
+	 * 
+	 * @param	str 	The string to be parsed
+	 * @return	A `FlxColor` or `null` if the `String` couldn't be parsed
+	 */
+	public static function fromString(str:String):Null<FlxColor>
+	{
+		var result:Null<FlxColor> = null;
+		str = StringTools.trim(str);
+		
+		if (COLOR_REGEX.match(str)) 
+		{
+			var hexColor:String = "0x" + COLOR_REGEX.matched(2);
+			result = new FlxColor(Std.parseInt(hexColor));
+			if (hexColor.length == 8) 
+			{
+				result.alphaFloat = 1;
+			}
+		}
+		else
+		{
+			str = str.toUpperCase();
+			for (key in colorLookup.keys())
+			{
+				if (key.toUpperCase() == str)
+				{
+					result = new FlxColor(colorLookup.get(key));
+					break;
+				}
+			}
+		}
+		
+		return result;
+	}
+	
+	/**
 	 * Get HSB color wheel values in an array which will be 360 elements in size
 	 * 
 	 * @param	Alpha Alpha value for each color of the color wheel, between 0 (transparent) and 255 (opaque)
@@ -159,14 +215,7 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	 */
 	public static function getHSBColorWheel(Alpha:Int = 255):Array<FlxColor>
 	{
-		var colors:Array<FlxColor> = new Array<FlxColor>();
-		
-		for (c in 0...360)
-		{
-			colors[c] = fromHSB(c, 1.0, 1.0, Alpha);
-		}
-		
-		return colors;
+		return [for (c in 0...360) fromHSB(c, 1.0, 1.0, Alpha)];
 	}
 	
 	/**
@@ -177,7 +226,7 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	 * @param 	Factor Value from 0 to 1 representing how much to shift Color1 toward Color2
 	 * @return	The interpolated color
 	 */
-	public static function interpolate(Color1:FlxColor, Color2:FlxColor, Factor:Float = 0.5):FlxColor
+	public static inline function interpolate(Color1:FlxColor, Color2:FlxColor, Factor:Float = 0.5):FlxColor
 	{
 		var r:Int = Std.int((Color2.red - Color1.red) * Factor + Color1.red);
 		var g:Int = Std.int((Color2.green - Color1.green) * Factor + Color1.green);
@@ -202,7 +251,7 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 		
 		if (Ease == null)
 		{
-			Ease = inline function(t:Float):Float
+			Ease = function(t:Float):Float
 			{
 				return t;
 			}
@@ -224,7 +273,6 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	{
 		return FlxColor.fromRGBFloat(lhs.redFloat * rhs.redFloat, lhs.greenFloat * rhs.greenFloat, lhs.blueFloat * rhs.blueFloat);
 	}
-	
 	
 	/**
 	 * Add the RGB channels of two FlxColors
@@ -252,7 +300,7 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	 */
 	public inline function getComplementHarmony():FlxColor
 	{		
-		return fromHSB(FlxMath.wrapValue(Std.int(hue), 180, 350), brightness, saturation, alphaFloat);
+		return fromHSB(FlxMath.wrap(Std.int(hue) + 180, 0, 350), brightness, saturation, alphaFloat);
 	}
 	
 	/**
@@ -264,8 +312,8 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	 */
 	public inline function getAnalogousHarmony(Threshold:Int = 30):Harmony
 	{
-		var warmer:Int = fromHSB(FlxMath.wrapValue(Std.int(hue), - Threshold, 350), saturation, brightness, alphaFloat);
-		var colder:Int = fromHSB(FlxMath.wrapValue(Std.int(hue), Threshold, 350), saturation, brightness, alphaFloat);
+		var warmer:Int = fromHSB(FlxMath.wrap(Std.int(hue) - Threshold, 0, 350), saturation, brightness, alphaFloat);
+		var colder:Int = fromHSB(FlxMath.wrap(Std.int(hue) + Threshold, 0, 350), saturation, brightness, alphaFloat);
 		
 		return {original: this, warmer: warmer, colder: colder};
 	}
@@ -279,9 +327,9 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	 */
 	public inline function getSplitComplementHarmony(Threshold:Int = 30):Harmony
 	{
-		var oppositeHue:Int = FlxMath.wrapValue(Std.int(hue), 180, 350);
-		var warmer:FlxColor = fromHSB(FlxMath.wrapValue(oppositeHue, - Threshold, 350), saturation, brightness, alphaFloat);
-		var colder:FlxColor = fromHSB(FlxMath.wrapValue(oppositeHue, Threshold, 350), saturation, brightness, alphaFloat);
+		var oppositeHue:Int = FlxMath.wrap(Std.int(hue) + 180, 0, 350);
+		var warmer:FlxColor = fromHSB(FlxMath.wrap(oppositeHue - Threshold, 0, 350), saturation, brightness, alphaFloat);
+		var colder:FlxColor = fromHSB(FlxMath.wrap(oppositeHue + Threshold, 0, 350), saturation, brightness, alphaFloat);
 		
 		return {original: this, warmer: warmer, colder: colder};
 	}
@@ -294,8 +342,8 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	 */
 	public inline function getTriadicHarmony():TriadicHarmony
 	{
-		var triadic1:FlxColor = fromHSB(FlxMath.wrapValue(Std.int(hue), 120, 359), saturation, brightness, alphaFloat);
-		var triadic2:FlxColor = fromHSB(FlxMath.wrapValue(Std.int(triadic1.hue), 120, 359), saturation, brightness, alphaFloat);
+		var triadic1:FlxColor = fromHSB(FlxMath.wrap(Std.int(hue) + 120, 0, 359), saturation, brightness, alphaFloat);
+		var triadic2:FlxColor = fromHSB(FlxMath.wrap(Std.int(triadic1.hue) + 120, 0, 359), saturation, brightness, alphaFloat);
 		
 		return {color1: this, color2: triadic1, color3: triadic2};
 	}
@@ -340,15 +388,13 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	 */
 	public function getColorInfo():String
 	{
-		var result:String = "";
-		
 		// Hex format
 		var result:String = toHexString() + "\n";
 		// RGB format
 		result += "Alpha: " + alpha + " Red: " + red + " Green: " + green + " Blue: " + blue + "\n";
 		// HSB/HSL info
 		result += "Hue: " + FlxMath.roundDecimal(hue, 2) + " Saturation: " + FlxMath.roundDecimal(saturation, 2) + 
-			" Brightness: " + FlxMath.roundDecimal(brightness, 2) + " Lightnes: " + FlxMath.roundDecimal(lightness, 2);
+			" Brightness: " + FlxMath.roundDecimal(brightness, 2) + " Lightness: " + FlxMath.roundDecimal(lightness, 2);
 		
 		return result;
 	}
@@ -363,7 +409,7 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	{
 		Factor = FlxMath.bound(Factor, 0, 1);
 		var output:FlxColor = this;
-		output.lightness *= (1 - Factor);
+		output.lightness = output.lightness * (1 - Factor);
 		return output;
 	}
 	
@@ -377,10 +423,9 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	{
 		Factor = FlxMath.bound(Factor, 0, 1);
 		var output:FlxColor = this;
-		output.lightness += (1 - lightness) * Factor;
+		output.lightness = output.lightness + (1 - lightness) * Factor;
 		return output;
 	}
-	
 	
 	/**
 	 * Get the inversion of this color
@@ -394,7 +439,6 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 		output.alpha = oldAlpha;
 		return output;
 	}
-	
 	
 	/**
 	 * Set RGB values as integers (0 to 255)
@@ -511,24 +555,40 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 		this = Value;
 	}
 	
+	private inline function getThis():Int
+	{
+		#if neko
+		return Std.int(this);
+		#else
+		return this;
+		#end
+	}
+	
+	private inline function validate():Void
+	{
+		#if neko
+		this = Std.int(this);
+		#end
+	}
+	
 	private inline function get_red():Int
 	{
-		return (this >> 16) & 0xff;
+		return (getThis() >> 16) & 0xff;
 	}
 	
 	private inline function get_green():Int
 	{
-		return (this >> 8) & 0xff;
+		return (getThis() >> 8) & 0xff;
 	}
 	
 	private inline function get_blue():Int
 	{
-		return this & 0xff;
+		return getThis() & 0xff;
 	}
 	
 	private inline function get_alpha():Int
 	{
-		return (this >> 24) & 0xff;
+		return (getThis() >> 24) & 0xff;
 	}
 	
 	private inline function get_redFloat():Float
@@ -553,6 +613,7 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	
 	private inline function set_red(Value:Int):Int
 	{
+		validate();
 		this &= 0xff00ffff;
 		this |= boundChannel(Value) << 16;
 		return Value;
@@ -560,6 +621,7 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	
 	private inline function set_green(Value:Int):Int
 	{
+		validate();
 		this &= 0xffff00ff;
 		this |= boundChannel(Value) << 8;
 		return Value;
@@ -567,6 +629,7 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	
 	private inline function set_blue(Value:Int):Int
 	{
+		validate();
 		this &= 0xffffff00;
 		this |= boundChannel(Value);
 		return Value;
@@ -574,6 +637,7 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	
 	private inline function set_alpha(Value:Int):Int
 	{
+		validate();
 		this &= 0x00ffffff;
 		this |= boundChannel(Value) << 24;
 		return Value;
@@ -712,29 +776,17 @@ abstract FlxColor(Int) from Int from UInt to Int to UInt
 	{
 		return Value > 0xff ? 0xff : Value < 0 ? 0 : Value;
 	}
-	
-	@:commutative
-	@:op(A == B)
-	private static inline function equal(lhs:FlxColor, rhs:Null<Int>):Bool
-	{
-		return lhs == cast rhs;
-	}
-	
-	@:commutative
-	@:op(A != B)
-	private static inline function notEqual(lhs:FlxColor, rhs:Null<Int>):Bool
-	{
-		return lhs != cast rhs;
-	}
 }
 
-typedef Harmony = { 
+typedef Harmony =
+{
 	original:FlxColor,
 	warmer:FlxColor,
 	colder:FlxColor
 }
 
-typedef TriadicHarmony = {
+typedef TriadicHarmony =
+{
 	color1:FlxColor,
 	color2:FlxColor,
 	color3:FlxColor

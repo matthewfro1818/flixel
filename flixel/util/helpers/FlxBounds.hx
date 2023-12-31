@@ -1,7 +1,6 @@
 package flixel.util.helpers;
 
 import flixel.util.FlxStringUtil;
-import flixel.math.FlxPoint;
 
 /**
  * Helper object for holding minimum and maximum values of various properties.
@@ -19,10 +18,10 @@ class FlxBounds<T>
 	/**
 	 * A flag that can be used to toggle the use of this property.
 	 */
-	public var active:Bool = false;
+	public var active:Bool = true;
 	
 	/**
-	 * Create a new Bounds object. Must be typed, e.g. var myBounds = new Bounds<Float>(0, 0);
+	 * Create a new Bounds object. Must be typed, e.g. `var bounds = new FlxBounds<Float>(0, 0)`;
 	 * 
 	 * @param	min  The minimum value of the property.
 	 * @param	max  The maximum value of the property. Optional, will be set equal to min if ignored.
@@ -53,9 +52,9 @@ class FlxBounds<T>
 	 * @param	OtherFlxBounds  The other FlxBounds to compare to this one.
 	 * @return	True if the FlxBounds have the same min and max value, false otherwise.
 	 */
-	public inline function equals(OtherFlxBounds:FlxBounds<T>):Bool
+	public inline function equals(otherBounds:FlxBounds<T>):Bool
 	{
-		return min == OtherFlxBounds.min && max == OtherFlxBounds.max;
+		return min == otherBounds.min && max == otherBounds.max;
 	}
 	
 	/**
